@@ -1,0 +1,15 @@
+# outputs, processed, studies
+*Outputs*
+*Processed*
+*Study*
+
+# Generated files
+*.vscode
+*.DS_Store
+
+# Jupyter
+*.ipynb*
+
+# Python
+*.egg-info
+*__pycache__
