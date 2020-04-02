@@ -7,7 +7,7 @@ from wisdem.aeroelasticse.CaseGen_IEC import CaseGen_IEC
 from wisdem.aeroelasticse.runFAST_pywrapper import runFAST_pywrapper_batch
 
 # FLAGS
-eagle = False
+eagle = True
 multi = True
 floating = False
 rosco = True
@@ -27,8 +27,8 @@ if eagle:
         FAST_directory = '/projects/ssc/nabbas/TurbineModels/5MW_Land_DLL_WTurb'  
         FAST_InputFile = '5MW_Land_DLL_WTurb.fst'  
     if rosco:
-        dll_filename = '/projects/ssc/nabbas/ROSCO/build/libdiscon.so'
-        PerfFile_path = '../5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
+        dll_filename = '/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so'
+        PerfFile_path = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
     else:
         if floating:
             dll_filename = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON_OC3/build/DISCON_OC3Hywind.dll'
@@ -47,21 +47,29 @@ else: # Just for local testing...
 # Output filepaths        
 if eagle: 
     if floating:
-        case_name_base = 'test_5MW_OC3Spar_legacy'
-        run_dir = '/projects/ssc/nabbas/DLC_Analysis/5MW_OC3Spar/5MW_OC3Spar_legacy/'
+        if rosco: 
+            case_name_base = '5MW_OC3Spar_rosco'
+            run_dir = '/projects/ssc/nabbas/DLC_Analysis/5MW_OC3Spar/5MW_OC3Spar_rosco/'
+        else:
+            case_name_base = '5MW_OC3Spar_legacy'
+            run_dir = '/projects/ssc/nabbas/DLC_Analysis/5MW_OC3Spar/5MW_OC3Spar_legacy/'
     else:
-        case_name_base = 'test_5MW_Land_legacy'
-        run_dir = '/projects/ssc/nabbas/DLC_Analysis//5MW_Land/5MW_Land_legacy/'
-    wind_dir = '/projects/ssc/nabbas/BatchAnalysis/wind/NREL5MW/'
+        if rosco:
+            case_name_base = '5MW_Land_rosco'
+            run_dir = '/projects/ssc/nabbas/DLC_Analysis/5MW_Land/5MW_Land_rosco/'
+        else:
+            case_name_base = '5MW_Land_legacy'
+            run_dir = '/projects/ssc/nabbas/DLC_Analysis/5MW_Land/5MW_Land_legacy/'
+    wind_dir = '/projects/ssc/nabbas/DLC_Analysis/wind/NREL5MW/'
 else:
-    case_name_base = 'test_5MW_Land_legacy'
+    case_name_base = '5MW_Land_legacy'
     run_dir = '../BatchOutputs/5MW_Land/5MW_Land_legacy/'
     wind_dir = '../BatchOutputs/wind/NREL5MW'
 
 # DLC inputs
-DLCs = [1.1]  # , 1.3]
-windspeeds = [5]  # , 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]
-seeds = [5]  # , 55]
+DLCs = [1.1, 1.3]
+windspeeds = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+seeds = [5, 51245]
 
 # Analysis time
 if floating:
@@ -188,6 +196,7 @@ var_out = [
     "LSSGagFza", "RotTorq", "LSSGagMya", "LSSGagMza", "YawBrFxp", "YawBrFyp", "YawBrFzp",
     "YawBrMxp", "YawBrMyp", "YawBrMzp", "TwrBsFxt", "TwrBsFyt", "TwrBsFzt", "TwrBsMxt",
     "TwrBsMyt", "TwrBsMzt", "TwHt1MLxt", "TwHt1MLyt", "TwHt1MLzt",
+    "LSShftFys", "LSShftFzs", "RotTorq", "LSSTipMys", "LSSTipMzs",
     # ServoDyn
     "GenPwr", "GenTq",
     # AeroDyn15
