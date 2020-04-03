@@ -13,7 +13,7 @@ floating = False
 rosco = True
 
 # Debug
-debug_level = 2
+debug_level = 1
 
 # Input filepaths, etc...
 if eagle:
@@ -69,7 +69,7 @@ else:
 # DLC inputs
 DLCs = [1.1, 1.3]
 windspeeds = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
-seeds = [5, 51245]
+seeds = [54321, 12345]
 
 # Analysis time
 if floating:

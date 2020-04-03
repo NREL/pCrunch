@@ -15,35 +15,35 @@ from ROSCO_toolbox import utilities as ROSCO_utilities
 import CaseGen_Control
 
 # FLAGS
-eagle = False
-multi = False
+eagle = True
+multi = True
 
 # Controller tuning yaml
 if eagle:
-    parameter_filename = '../TurbineModels/ControllerYamls/BAR.yaml'
+    parameter_filename = '../../TurbineModels/ControllerYamls/BAR.yaml'
 else: 
     parameter_filename = '../../Turbine_Tuning/BAR/BAR.yaml'
 
 # Generate case inputs for control related stuff
 input_params = ['zeta_flp', 'omega_flp']
 DISCON_params = ['Flp_Kp', 'Flp_Ki']
-values = [[0.7, 0.8], [1.0]]
+# values = [[0.7, 0.8], [3.0]]
 values = [np.around(np.arange(0.7, 1.1, 0.02),      decimals=3),  # use np.around to avoid precision issues
           np.around(np.arange(1.0, 3.0, 0.1) ,      decimals=3)]
 group = 1
 
 # Some path specifics/
 if eagle:
-    FAST_InputFile = 'WISDEM_BAR2011n.fst'    # FAST input file (ext=.fst)
-    FAST_directory = '/projects/bar/nabbas/TurbineModels/WISDEM_BAR2011n_15p/'
-    FAST_runDirectory = 'temp'  # '/projects/bar/nabbas/BatchAnalysis/FlapGainSweep/WISDEM_BAR2011n_15p'
+    FAST_InputFile = 'BAR_15p_8s_0.fst'    # FAST input file (ext=.fst)
+    FAST_directory = '/projects/bar/nabbas/TurbineModels/BAR_15p_8s'
+    FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep'
     wind_dir = '/projects/bar/nabbas/TurbineModels/wind'
     Turbsim_exe = 'turbsim'
-    FAST_exe = 'openfast_flap'
+    FAST_exe = 'openfast'
 else:
     FAST_InputFile = 'WISDEM_BAR2011n.fst'    # FAST input file (ext=.fst)
-    FAST_directory = '/Users/nabbas/Documents/TurbineModels/BAR/WISDEM_BAR2011n_15p/'
-    FAST_runDirectory = 'temp'  # '/projects/bar/nabbas/BatchAnalysis/FlapGainSweep/WISDEM_BAR2011n_15p'
+    # FAST_directory = '/Users/nabbas/Documents/TurbineModels/BAR/WISDEM_BAR2011n_15p/'
+    FAST_runDirectory = 'temp'  
     wind_dir = '/Users/nabbas/Documents/TurbineModels/BAR/wind'
     Turbsim_exe = 'turbsim_dev'
     FAST_exe = 'openfast_flap'
@@ -57,7 +57,7 @@ WindType = [3]
 Uref = [12.0]
 
 # Time
-TMax = 10
+TMax = 330
 
 # Turbine Definition
 D = 206     # Rotor Diameter
@@ -71,6 +71,10 @@ else:
 
 # Initialize CaseGen
 cgc = CaseGen_Control.CaseGen_Control(parameter_filename)
+
+# Modify some parameters
+cgc.path_params['FAST_InputFile'] = FAST_InputFile
+cgc.path_params['FAST_directory'] = FAST_directory
 cgc.AnalysisTime = TMax
 cgc.case_name_base = case_name_base
 cgc.D = D

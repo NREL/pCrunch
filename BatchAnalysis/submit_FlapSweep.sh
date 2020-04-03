@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --account=ssc
+#SBATCH --account=bar
 #SBATCH --time=0-04:00:00
-#SBATCH --job-name=NREL5MW_rosco
+#SBATCH --job-name=BAR_GainSweep
 #SBATCH --nodes=1
 #SBATCH --ntasks=36
 #SBATCH --mail-user nabbas@nrel.gov
@@ -16,4 +16,4 @@ N=36
 
 . /home/nabbas/Documents/batch_scripts/init_batch-env.sh
 
-python3 /home/nabbas/Documents/BatchAnalysis/BatchAnalysis/run_DLC_NREL5MW.py
+python3 /home/nabbas/Documents/BatchAnalysis/BatchAnalysis/run_FlapGainSweep_BAR.py
