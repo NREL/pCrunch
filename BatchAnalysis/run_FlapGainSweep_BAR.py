@@ -38,13 +38,15 @@ if eagle:
     FAST_directory = '/projects/bar/nabbas/TurbineModels/BAR_15p_8s'
     FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep'
     wind_dir = '/projects/bar/nabbas/TurbineModels/wind'
+    dll_filename = '/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so'
     Turbsim_exe = 'turbsim'
     FAST_exe = 'openfast'
 else:
-    FAST_InputFile = 'WISDEM_BAR2011n.fst'    # FAST input file (ext=.fst)
-    # FAST_directory = '/Users/nabbas/Documents/TurbineModels/BAR/WISDEM_BAR2011n_15p/'
+    FAST_InputFile = 'OpenFAST_BAR_10.fst'    # FAST input file (ext=.fst)
+    FAST_directory = '/Users/nabbas/Documents/TurbineModels/BAR/OpenFAST_Models/BAR_10/'
     FAST_runDirectory = 'temp'  
     wind_dir = '/Users/nabbas/Documents/TurbineModels/BAR/wind'
+    dll_filename = '/Users/nabbas/Documents/TurbineModels/TurbineControllers/FortranControllers/ROSCO/build/libdiscon.dylib'
     Turbsim_exe = 'turbsim_dev'
     FAST_exe = 'openfast_flap'
 
@@ -98,6 +100,9 @@ if group == 0:
     case_inputs[("Fst", "TMax")] = {'vals': TMax_list, 'group': 0}
 else:
     case_inputs[("Fst", "TMax")] = {'vals': [TMax], 'group': 0}
+
+# DISCON
+case_inputs[('ServoDyn', 'DLL_FileName')] = {'vals': [dll_filename], 'group': 0}
 
 # Wind
 case_inputs[("InflowWind", "WindType")] = {'vals': [wind_file_type], 'group': 0}
