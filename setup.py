@@ -26,7 +26,7 @@ from setuptools import find_packages, setup, Command
 
 # Package meta-data.
 NAME = 'BatchAnalysis'
-DESCRIPTION = 'Some tools for batch analysis of openFAST runs'
+DESCRIPTION = 'Some tools for batch analysis of OpenFAST runs'
 URL = 'https://github.com/nikhar-abbas/BatchAnalysis'
 EMAIL = 'nikhar.abbas@nrel.gov'
 AUTHOR = 'Nikhar Abbas'
@@ -41,6 +41,7 @@ REQUIRED = [
     'pytest',
     'scipy',
     'pyYAML',
+    'seaborn'
 ]
 
 # Read the docs, one day, so we'll throw it in here!
