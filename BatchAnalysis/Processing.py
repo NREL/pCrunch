@@ -111,7 +111,7 @@ class FAST_Processing(object):
 
     def batch_processing(self):
         '''
-        Run 
+        Run a full batch processing case!
         '''
         # ------------------ Input consistancy checks ------------------ #
         # Do we have a list of data?
@@ -170,7 +170,7 @@ class FAST_Processing(object):
         else:
             # Initialize Analysis
             loads_analysis = Analysis.Loads_Analysis()
-            loads_analysis.verbose = verbose
+            loads_analysis.verbose = self.verbose
             loads_analysis.t0 = self.t0
             loads_analysis.tf = self.tf
 
@@ -219,7 +219,22 @@ class FAST_Processing(object):
 
         return stats, load_rankings
 
-    def design_comparison(self, filenames, verbose=False):
+    def design_comparison(self, filenames):
+        '''
+        Compare design runs
+
+        Parameters:
+        ----------
+        filenames: list
+            list of lists, where the inner lists are of equal length. 
+
+        Returns:
+        --------
+        stats: dict
+            dictionary of summary statistics data
+        load_rankings: dict
+            dictionary of load rankings
+        '''
 
 
         # Make sure datasets are the same length
@@ -230,7 +245,7 @@ class FAST_Processing(object):
         fnames = np.array(filenames).T.tolist()
         # Setup FAST_Analysis preferences
         loads_analysis = Analysis.Loads_Analysis()
-        loads_analysis.verbose=verbose
+        loads_analysis.verbose=self.verbose
         loads_analysis.t0 = self.t0
         loads_analysis.tf = self.tf
 
@@ -268,10 +283,21 @@ def get_windspeeds(case_matrix, return_df=False):
     '''
     Find windspeeds from case matrix
 
-    Inputs:
-    -------
+    Parameters:
+    ----------
     case_matrix: dict
         case matrix data loaded from wisdem.aeroelasticse.Util.FileTools.load_yaml
+    
+    Returns:
+    --------
+    windspeed: list
+        list of wind speeds
+    seed: seed
+        list of wind seeds
+    IECtype: list
+        list of IEC types 
+    case_matrix: pd.DataFrame
+        case matrix dataframe with appended wind info
     '''
     if isinstance(case_matrix, dict):
         cmatrix = case_matrix

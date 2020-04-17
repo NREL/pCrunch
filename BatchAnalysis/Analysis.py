@@ -52,7 +52,7 @@ class Loads_Analysis(object):
         Load openfast data - get statistics - get load ranking - return data
         NOTE: Can be called to run in parallel if get_load_ranking=False (see Processing.batch_processing)
 
-        Inputs:
+        Parameters:
         -------
         filenames: list
             List of filenames to load and analyse
@@ -75,7 +75,7 @@ class Loads_Analysis(object):
         fast_data = fast_io.load_FAST_out(filenames, tmin=self.t0, tmax=self.tf, verbose=self.verbose)
 
         # Get summary statistics
-        sum_stats = self.summary_stats(fast_data, verbose=self.verbose)
+        sum_stats = self.summary_stats(fast_data)
 
         # Get load rankings
         if get_load_ranking:
@@ -91,20 +91,18 @@ class Loads_Analysis(object):
         else:
             return sum_stats
 
-    def summary_stats(self, fast_data, channel_list=[], verbose=False):
+    def summary_stats(self, fast_data, channel_list=[]):
         '''
         Get summary statistics from openfast output data. 
 
-        Parameters
+        Parameters:
         ----------
         fast_data: list
             List of dictionaries containing openfast output data (returned from ROSCO_toolbox.FAST_IO.load_output)
         channel_list: list
             list of channels to collect data from. Defaults to all
-        verbose: bool, optional
-            Print some status info
 
-        Returns
+        Returns:
         -------
         data_out: dict
             Dictionary containing summary statistics
@@ -113,7 +111,7 @@ class Loads_Analysis(object):
         '''
         sum_stats = {}
         for fd in fast_data:
-            if verbose:
+            if self.verbose:
                 print('Processing data for {}'.format(fd['meta']['name']))
 
             # Build channel list if it isn't input
@@ -154,7 +152,7 @@ class Loads_Analysis(object):
         '''
         Find load rankings for desired signals
 
-        Inputs:
+        Parameters:
         -------
         stats: dict, list, pd.DataFrame
             summary statistic information
@@ -180,7 +178,9 @@ class Loads_Analysis(object):
             stats_df = pdTools.dict2df([stats], names=names)
         elif isinstance(stats, list):
             stats_df = pdTools.dict2df(stats, names=names)
-        elif not isinstance(stats, pd.DataFrame):
+        elif isinstance(stats, pd.DataFrame):
+            stats_df = stats
+        else:
             raise TypeError('Input stats is must be a dictionary, list, or pd.DataFrame containing OpenFAST output statistics.')
 
 
@@ -268,8 +268,8 @@ class Power_Production(object):
         wind distribution with shape factor = 2. Note this method differs slightly from IEC standard, but results end
         up being very close especially with higher resolution
         
-        Inputs:
-        -------
+        Parameters:
+        -----------
         Vavg: float
             average wind speed of the site 
         bnums: int
@@ -301,8 +301,8 @@ class Power_Production(object):
 
         TODO: Print/Save this someplace besides the console
     
-        Inputs:
-        -------
+        Parameters:
+        ----------
         stats: dict, list, pd.DataFrame
             Dict (single case), list(multiple cases), df(single or multiple cases) containing
             summary statistics. 
@@ -348,7 +348,7 @@ class wsPlotting(object):
         Plot the turbulent power curve for a set of data. 
         Can be plotted as bar (good for comparing multiple cases) or line 
 
-        Inputs:
+        Parameters:
         -------
         windspeeds: list-like
             List of wind speeds to plot
