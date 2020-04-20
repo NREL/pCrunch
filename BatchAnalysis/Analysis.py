@@ -193,6 +193,7 @@ class Loads_Analysis(object):
         cnames = [pd.MultiIndex.from_product([names, var, [stat]])
                 for var, stat in zip(ranking_vars, ranking_stats)]
 
+        rank__ascending = False
         # Collect load rankings
         collected_rankings = []
         for col in cnames:
@@ -218,14 +219,17 @@ class Loads_Analysis(object):
             # Extract desired variables from stats dataframe
             if mi_stat in ['max', 'abs']:
                 var_df = stats_df[col].max(axis=1, level=0)
+                rank__ascending = False
             elif mi_stat in ['min']:
                 var_df = stats_df[col].min(axis=1, level=0)
+                rank__ascending = True
             elif mi_stat in ['mean', 'std']:
                 var_df = stats_df[col].mean(axis=1, level=0)
+                rank__ascending = False
 
-            # Combine ranking dataframes
+            # Combine ranking dataframes for each dataset
             var_df_list = [var_df[column].sort_values(
-                ascending=False).reset_index() for column in var_df.columns]
+                ascending=rank__ascending).reset_index() for column in var_df.columns]
             single_lr = pd.concat(var_df_list, axis=1)
             single_lr.columns = mi_colnames
             collected_rankings.append(single_lr)
