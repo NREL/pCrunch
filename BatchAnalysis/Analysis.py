@@ -31,8 +31,8 @@ class Loads_Analysis(object):
     def __init__(self, **kwargs):
 
         # Analysis time range
-        self.t0 = 0
-        self.tf = 1000000
+        self.t0 = None
+        self.tf = None
         # Desired channels for analysis
         self.channel_list = []
 

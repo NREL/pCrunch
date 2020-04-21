@@ -37,8 +37,8 @@ class FAST_Processing(object):
         self.verbose = False            # True/False; Enable/Disable non-error message outputs to screen
 
         # Analysis Options
-        self.t0 = 0.       # float>=0    ; start time to include in analysis
-        self.tf = 10000  # float>=0,-1 ; end time to include in analysis
+        self.t0 = None       # float>=0    ; start time to include in analysis
+        self.tf = None  # float>=0,-1 ; end time to include in analysis
 
         # Load ranking
         self.ranking_vars = [   ["RotSpeed"], 
@@ -277,7 +277,6 @@ class FAST_Processing(object):
 
 
         return stats, load_rankings
-        # _, _, fast_data = fast_io.load_FAST_out(filenames, tmin=t0, tmax=tf)
 
 def get_windspeeds(case_matrix, return_df=False):
     '''
