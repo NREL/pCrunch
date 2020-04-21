@@ -124,17 +124,23 @@ class FAST_Processing(object):
         # Do all the files exist?
         files_exist = True
         for i, flist in enumerate(self.OpenFAST_outfile_list):
-            for fname in flist:
-                if not os.path.exists(fname):
-                    files_exist = False
-                    if len(self.dataset_names) > 0:
-                        print('Warning! File "{}" from {} does not exist.'.format(
-                            fname, self.dataset_names[i]))
+            if isinstance(flist, str):
+                if not os.path.exists(flist):
+                        print('Warning! File "{}" does not exist.'.format(
+                            fname))
                         flist.remove(fname)
-                    else:
-                        print('Warning! File "{}" from dataset {} of {} does not exist.'.format(
-                              fname, i+1, N))
-                        flist.remove(fname)
+            elif isinstance(flist, list):
+                for fname in flist:
+                    if not os.path.exists(fname):
+                        files_exist = False
+                        if len(self.dataset_names) > 0:
+                            print('Warning! File "{}" from {} does not exist.'.format(
+                                fname, self.dataset_names[i]))
+                            flist.remove(fname)
+                        else:
+                            print('Warning! File "{}" from dataset {} of {} does not exist.'.format(
+                                fname, i+1, N))
+                            flist.remove(fname)
 
         # # load case matrix data to get descriptive case naming
         # if self.fname_case_matrix == '':
@@ -163,7 +169,7 @@ class FAST_Processing(object):
             self.namebase = ['dataset' + ('{}'.format(i)).zfill(len(str(N-1))) for i in range(N)]
         
         # Run design comparison if filenames list has multiple lists
-        if (len(self.OpenFAST_outfile_list) > 1) and (isinstance(self.OpenFAST_outfile_list, list)): 
+        if (len(self.OpenFAST_outfile_list) > 1) and (isinstance(self.OpenFAST_outfile_list[0], list)): 
             # Load stats and load rankings for design comparisons
             stats, load_rankings = self.design_comparison(self.OpenFAST_outfile_list, verbose=self.verbose)
         
