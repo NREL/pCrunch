@@ -148,7 +148,7 @@ class Loads_Analysis(object):
         return sum_stats
 
 
-    def load_ranking(self, stats, ranking_stats, ranking_vars, names=[], get_df=False):
+    def load_ranking(self, stats, ranking_stats, ranking_vars, names=[], get_df=False, verbose=False):
         '''
         Find load rankings for desired signals
 
@@ -188,6 +188,9 @@ class Loads_Analysis(object):
         if not names:
             names = list(stats_df.columns.levels[0])
 
+        if verbose:
+            print('Calculating load rankings.')
+            
         # Column names to search in stats_df
         #  - [name, variable, stat],  i.e.['DLC1.1','TwrBsFxt','max']
         cnames = [pd.MultiIndex.from_product([names, var, [stat]])
