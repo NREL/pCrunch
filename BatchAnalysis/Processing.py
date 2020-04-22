@@ -192,10 +192,10 @@ class FAST_Processing(object):
                 pool.join()
 
                 # Re-sort into the more "standard" dictionary/dataframe format we like
-                stats_df = pdTools.dict2df(stats_separate)
-                stats_df = stats_df.stack().stack()
-                stats_df = stats_df.swaplevel(1, 2).T.reset_index(drop=True).sort_index(axis=1)
-                stats = pdTools.df2dict(stats_df)
+                stats = [pdTools.dict2df(ss).unstack() for ss in stats_separate]
+                dft = pd.DataFrame(stats)
+                dft = dft.reorder_levels([2, 0, 1], axis=1).sort_index(axis=1, level=0)
+                stats = pdTools.df2dict(dft)
 
                 # Get load rankings after stats are loaded
                 load_rankings = loads_analysis.load_ranking(stats, self.ranking_stats, self.ranking_vars,
@@ -266,10 +266,10 @@ class FAST_Processing(object):
             pool.join()
         
             # Re-sort into the more "standard" dictionary/dataframe format we like
-            stats_df = pdTools.dict2df(stats_separate)
-            stats_df = stats_df.stack().stack()
-            stats_df = stats_df.swaplevel(1, 2).T.reset_index(drop=True).sort_index(axis=1)
-            stats = pdTools.df2dict(stats_df) 
+            stats = [pdTools.dict2df(ss).unstack() for ss in stats_separate]
+            dft = pd.DataFrame(stats)
+            dft = dft.reorder_levels([2, 0, 1], axis=1).sort_index(axis=1, level=0)
+            stats = pdTools.df2dict(dft)
 
             # Get load rankings after stats are loaded
             load_rankings = loads_analysis.load_ranking(stats, self.ranking_stats, self.ranking_vars, 
