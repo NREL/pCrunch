@@ -94,7 +94,7 @@ class Loads_Analysis(object):
 
         # Get load rankings
         if get_load_ranking:
-            load_rankings = self.load_ranking(sum_stats)
+            load_rankings = self.load_ranking(sum_stats, verbose=self.verbose)
 
 
         if return_FastData:
@@ -163,6 +163,7 @@ class Loads_Analysis(object):
         return sum_stats
 
 
+    def load_ranking(self, stats, names=[], get_df=False, verbose=False):
         '''
         Find load rankings for desired signals
 
@@ -218,7 +219,7 @@ class Loads_Analysis(object):
             mi_name = list(col.levels[0])
             mi_stat = col.levels[2]  # length = 1
             mi_idx = col.levels[2][0] + '_case_idx'
-            if len(col.levels[1]) > 0:
+            if len(col.levels[1]) > 1:
                 mi_var = [col.levels[1][0][:-1]]
             else:
                 mi_var = list(col.levels[1])
