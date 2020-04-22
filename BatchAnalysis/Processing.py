@@ -198,11 +198,17 @@ class FAST_Processing(object):
                 stats = pdTools.df2dict(dft)
 
                 # Get load rankings after stats are loaded
-                load_rankings = loads_analysis.load_ranking(stats, self.ranking_stats, self.ranking_vars,
+                load_rankings = loads_analysis.load_ranking(stats,
                                             names=self.dataset_names, get_df=False)
            
             # run analysis in serial
             else:
+                # Initialize Analysis
+                loads_analysis = Analysis.Loads_Analysis()
+                loads_analysis.verbose = self.verbose
+                loads_analysis.t0 = self.t0
+                loads_analysis.tf = self.tf
+
                 stats, load_rankings = loads_analysis.full_loads_analysis(self.OpenFAST_outfile_list, get_load_ranking=True)
 
         if self.save_SummaryStats:
@@ -254,11 +260,10 @@ class FAST_Processing(object):
         loads_analysis.verbose=self.verbose
         loads_analysis.t0 = self.t0
         loads_analysis.tf = self.tf
+        loads_analysis.ranking_vars = self.ranking_vars
+        loads_analysis.ranking_stats = self.ranking_stats
 
         if self.parallel_analysis: # run analysis in parallel
-            # Make sure multi-processing cores are valid
-            if not self.parallel_cores:
-                self.parallel_cores = min(mp.cpu_count(), len(filenames))
             # run analysis
             pool = mp.Pool(self.parallel_cores)
             stats_separate = pool.map(partial(loads_analysis.full_loads_analysis, get_load_ranking=False), fnames)
@@ -272,8 +277,7 @@ class FAST_Processing(object):
             stats = pdTools.df2dict(dft)
 
             # Get load rankings after stats are loaded
-            load_rankings = loads_analysis.load_ranking(stats, self.ranking_stats, self.ranking_vars, 
-                                                        names=self.dataset_names, get_df=False)
+            load_rankings = loads_analysis.load_ranking(stats) 
 
         else: # run analysis in serial
             stats = []
