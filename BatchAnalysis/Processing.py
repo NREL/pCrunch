@@ -277,8 +277,12 @@ class FAST_Processing(object):
 
         else: # run analysis in serial
             stats = []
+            load_rankings = []
             for file_sets in filenames:
-                stats, load_rankings, stats.append(loads_analysis.full_loads_analysis(file_sets, get_load_ranking=False))
+                st, lr = loads_analysis.full_loads_analysis(file_sets, get_load_ranking=True)
+                stats.append(st)
+                load_rankings.append(lr)
+            
 
 
 
