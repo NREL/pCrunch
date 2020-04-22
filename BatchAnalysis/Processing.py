@@ -71,7 +71,7 @@ class FAST_Processing(object):
         if self.parallel_analysis:
             # Make sure multi-processing cores are valid
             if not self.parallel_cores:
-                self.parallel_cores = min(mp.cpu_count(), len(filenames))
+                self.parallel_cores = mp.cpu_count()
             elif self.parallel_cores == 1:
                 self.parallel_analysis = False
 
