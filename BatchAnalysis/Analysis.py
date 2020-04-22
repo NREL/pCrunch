@@ -36,6 +36,21 @@ class Loads_Analysis(object):
         # Desired channels for analysis
         self.channel_list = []
 
+        # Load Ranking 
+        self.ranking_vars = [["RotSpeed"],
+                             ["TipDxc1", "TipDxc2", "TipDxc3"],
+                             ["TipDyc1", "TipDyc2", "TipDyc3"],
+                             ['RootMyb1', 'RootMyb2', 'RootMyb3'],
+                             ['RootMxb1', 'RootMxb2', 'RootMxb3'],
+                             ['TwrBsFyt']
+                             ]  # List of lists
+        self.ranking_stats = ['max',
+                              'max',
+                              'max',
+                              'max',
+                              'max',
+                              ]  # should be same length as ranking_vars
+
         # verbose?
         self.verbose=False
 
@@ -148,7 +163,6 @@ class Loads_Analysis(object):
         return sum_stats
 
 
-    def load_ranking(self, stats, ranking_stats, ranking_vars, names=[], get_df=False, verbose=False):
         '''
         Find load rankings for desired signals
 
@@ -194,7 +208,7 @@ class Loads_Analysis(object):
         # Column names to search in stats_df
         #  - [name, variable, stat],  i.e.['DLC1.1','TwrBsFxt','max']
         cnames = [pd.MultiIndex.from_product([names, var, [stat]])
-                for var, stat in zip(ranking_vars, ranking_stats)]
+                for var, stat in zip(self.ranking_vars, self.ranking_stats)]
 
         rank__ascending = False
         # Collect load rankings
