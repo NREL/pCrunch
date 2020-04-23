@@ -20,7 +20,7 @@ multi = True
 
 # Controller tuning yaml
 if eagle:
-    parameter_filename = '../../TurbineModels/ControllerYamls/BAR.yaml'
+    parameter_filename = '/home/nabbas/Documents/TurbineModels/ControllerYamls/BAR.yaml'
 else: 
     parameter_filename = '../../Turbine_Tuning/BAR/BAR.yaml'
 
@@ -36,7 +36,7 @@ group = 1
 if eagle:
     FAST_InputFile = 'BAR_15p_8s_0.fst'    # FAST input file (ext=.fst)
     FAST_directory = '/projects/bar/nabbas/TurbineModels/BAR_15p_8s'
-    FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep'
+    FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep2'
     wind_dir = '/projects/bar/nabbas/TurbineModels/wind'
     dll_filename = '/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so'
     Turbsim_exe = 'turbsim'
@@ -50,7 +50,7 @@ else:
     Turbsim_exe = 'turbsim_dev'
     FAST_exe = 'openfast_dev'
 
-case_name_base = 'testing'
+case_name_base = 'BAR_15p_8s'
 debug_level = 2
 
 
