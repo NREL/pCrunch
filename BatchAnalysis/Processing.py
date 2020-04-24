@@ -126,9 +126,9 @@ class FAST_Processing(object):
         for i, flist in enumerate(self.OpenFAST_outfile_list):
             if isinstance(flist, str):
                 if not os.path.exists(flist):
-                        print('Warning! File "{}" does not exist.'.format(
-                            fname))
-                        flist.remove(fname)
+                    print('Warning! File "{}" does not exist.'.format(
+                        flist))
+                    self.OpenFAST_outfile_list.remove(flist)
             elif isinstance(flist, list):
                 for fname in flist:
                     if not os.path.exists(fname):
@@ -166,7 +166,11 @@ class FAST_Processing(object):
             self.namebase = []
         # as last resort, give generic name
         if not self.namebase:
-            self.namebase = ['dataset' + ('{}'.format(i)).zfill(len(str(N-1))) for i in range(N)]
+            if isinstance(self.OpenFAST_outfile_list[0], str):
+                # Just one dataset name for single dataset
+                self.namebase = ['dataset1']
+            else:
+                self.namebase = ['dataset' + ('{}'.format(i)).zfill(len(str(N-1))) for i in range(N)]
         
         # Run design comparison if filenames list has multiple lists
         if (len(self.OpenFAST_outfile_list) > 1) and (isinstance(self.OpenFAST_outfile_list[0], list)): 
@@ -214,18 +218,26 @@ class FAST_Processing(object):
         if self.save_SummaryStats:
             if isinstance(stats, dict):
                 fname = self.namebase[0] + '_stats.yaml'
+                if self.verbose:
+                    print('Saving {}'.format(fname))
                 save_yaml(self.results_dir, fname, stats)
             else:
                 for namebase, st in zip(self.namebase, stats):
                     fname = namebase + '_stats.yaml'
+                    if self.verbose:
+                        print('Saving {}'.format(fname))
                     save_yaml(self.results_dir, fname, st)
         if self.save_LoadRanking:
             if isinstance(load_rankings, dict):
                 fname = self.namebase[0] + '_LoadRanking.yaml'
+                if self.verbose:
+                    print('Saving {}'.format(fname))
                 save_yaml(self.results_dir, fname, load_rankings)
             else:
                 for namebase, lr in zip(self.namebase, load_rankings):
                     fname = namebase + '_LoadRanking.yaml'
+                    if self.verbose:
+                        print('Saving {}'.format(fname))
                     save_yaml(self.results_dir, fname, lr)
 
 
