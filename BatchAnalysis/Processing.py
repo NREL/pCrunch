@@ -158,7 +158,11 @@ class FAST_Processing(object):
                                      '_', '-']]).rstrip() for i, name in zip(range(N), self.dataset_names)]
         elif len(self.OpenFAST_outfile_list) > 0:
             # use out file naming
-            self.namebase = ['_'.join(os.path.split(flist[0])[1].split('_')[:-1])
+            if isinstance(self.OpenFAST_outfile_list[0], list):
+                self.namebase = ['_'.join(os.path.split(flist[0])[1].split('_')[:-1])
+                             for flist in self.OpenFAST_outfile_list]
+            else:
+                self.namebase = ['_'.join(os.path.split(flist)[1].split('_')[:-1])
                              for flist in self.OpenFAST_outfile_list]
         
         # check that names are unique
