@@ -117,9 +117,8 @@ class FAST_Processing(object):
         # Do we have a list of data?
         N = len(self.OpenFAST_outfile_list)
         if N == 0:
-            print('Output files not defined! Populate: "FastPost.OpenFAST_outfile_list"')
-            print('Quitting FastPost analysis')
-            exit()
+            raise ValueError('Output files not defined! Populate: "FastPost.OpenFAST_outfile_list". \n Quitting FAST_Processing.')
+            
 
         # Do all the files exist?
         files_exist = True

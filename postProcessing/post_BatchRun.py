@@ -39,7 +39,6 @@ for file in os.listdir(output_dir):
     elif file.endswith('.out'):
         outfiles.append(output_dir + file)
 
-outfiles = outfiles
 
 # Initialize processing classes
 fp = Processing.FAST_Processing()
@@ -56,7 +55,6 @@ fp.verbose=True
 if save_results:
     fp.save_LoadRanking = True
     fp.save_SummaryStats = True
-    fp.results_dir = results_dir
 
 # Load and save statistics and load rankings
 stats, load_rankings = fp.batch_processing()
