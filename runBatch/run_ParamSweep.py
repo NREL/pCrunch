@@ -1,3 +1,5 @@
+
+# %%
 """
 A python script to run a parameter sweep
 """
@@ -88,6 +90,11 @@ else:
 case_inputs[("InflowWind", "WindType")] = {'vals': [wind_file_type], 'group': 0}
 case_inputs[("InflowWind", "Filename")] = {'vals': [wind_file], 'group': 0}
 
+# Controller modes
+for key in cgc.controller_params.keys():
+    if 'mode' in key.lower():
+        case_inputs[('DISCON_in', key)] = {'vals': [cgc.controller_params[key]],
+                                           'group': 0}
 # FAST details
 fastBatch = runFAST_pywrapper.runFAST_pywrapper_batch(FAST_ver='OpenFAST', dev_branch=True)
 fastBatch.FAST_exe = FAST_exe  # Path to executable
@@ -142,6 +149,7 @@ fastBatch.channels = channels
 fastBatch.case_list = case_list
 fastBatch.case_name_list = case_name_list
 
+# %%
 # if multi:
 #     fastBatch.run_multi(cores)
 #     # fastBatch.run_mpi()
