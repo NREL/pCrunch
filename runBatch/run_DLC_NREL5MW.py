@@ -3,17 +3,19 @@ Run DLC test suites
 
 Kind of like run DMC, but less hip-hop, so less fun. 
 '''
+import os
 from wisdem.aeroelasticse.CaseGen_IEC import CaseGen_IEC
 from wisdem.aeroelasticse.runFAST_pywrapper import runFAST_pywrapper_batch
-
+from wisdem.aeroelasticse.Util import FileTools
 # FLAGS
 eagle = True
 multi = True
 floating = False
 rosco = True
+save_stats = True
 
 # Debug
-debug_level = 1
+debug_level = 2
 
 # Input filepaths, etc...
 if eagle:
@@ -35,8 +37,8 @@ if eagle:
         else:
             dll_filename = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON/build/DISCON.dll'
 else: # Just for local testing... 
-    FAST_exe = 'openfast_dev'
-    Turbsim_exe = 'turbsim_dev'
+    FAST_exe = '/Users/nabbas/openfast/install/bin/openfast_dev'
+    Turbsim_exe = '/Users/nabbas/openfast/install/bin/turbsim_dev'
     cores = 4
     FAST_directory = '/Users/nabbas/Documents/WindEnergyToolbox/ROSCO_toolbox/Test_Cases/5MW_Land_DLL_WTurb'
     FAST_InputFile = '5MW_Land_DLL_WTurb.fst'
@@ -215,8 +217,42 @@ case_list, case_name_list = iec.execute(case_inputs=case_inputs)
 fastBatch.case_list = case_list
 fastBatch.case_name_list = case_name_list
 fastBatch.debug_level = debug_level
-
 if multi:
     fastBatch.run_multi()
 else:
     fastBatch.run_serial()
+
+
+# Save statistics
+if save_stats:
+    from BatchAnalysis import pdTools, Processing
+    fp = Processing.FAST_Processing()
+
+    # Find all outfiles
+    outfiles = []
+    for file in os.listdir(run_dir):
+        if file.endswith('.outb'):
+            print(file)
+            outfiles.append(os.path.join(run_dir, file))
+        elif file.endswith('.out'):
+            outfiles.append(os.path.join(run_dir, file))
+
+    outfiles = outfiles
+
+    # Set some processing parameters
+    fp.OpenFAST_outfile_list = outfiles
+    fp.namebase = case_name_base
+    fp.t0 = 1
+    fp.parallel_analysis = True
+    fp.results_dir = os.path.join(run_dir,'stats')
+    fp.verbose = True
+
+    fp.save_LoadRanking = True
+    fp.save_SummaryStats = True
+
+    # Load and save statistics and load rankings
+    stats, load_rankings = fp.batch_processing()
+
+
+
+
