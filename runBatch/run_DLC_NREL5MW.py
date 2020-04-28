@@ -3,17 +3,19 @@ Run DLC test suites
 
 Kind of like run DMC, but less hip-hop, so less fun. 
 '''
+import os
 from wisdem.aeroelasticse.CaseGen_IEC import CaseGen_IEC
 from wisdem.aeroelasticse.runFAST_pywrapper import runFAST_pywrapper_batch
-
+from wisdem.aeroelasticse.Util import FileTools
 # FLAGS
 eagle = True
 multi = True
 floating = False
 rosco = True
+save_stats = True
 
 # Debug
-debug_level = 1
+debug_level = 2
 
 # Input filepaths, etc...
 if eagle:
@@ -23,26 +25,25 @@ if eagle:
     if floating:
         FAST_directory = '/projects/ssc/nabbas/TurbineModels/5MW_OC3Spar_DLL_WTurb_WavesIrr'
         FAST_InputFile = '5MW_OC3Spar_DLL_WTurb_WavesIrr.fst'
+        dll_filename = ['/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so',
+                        '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON_OC3/build/DISCON_OC3Hywind.dll']
     else:
         FAST_directory = '/projects/ssc/nabbas/TurbineModels/5MW_Land_DLL_WTurb'  
         FAST_InputFile = '5MW_Land_DLL_WTurb.fst'  
-    if rosco:
-        dll_filename = '/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so'
-        PerfFile_path = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
-    else:
-        if floating:
-            dll_filename = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON_OC3/build/DISCON_OC3Hywind.dll'
-        else:
-            dll_filename = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON/build/DISCON.dll'
+        dll_filename = ['/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so',
+                        '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON/build/DISCON.dll']
+
+    PerfFile_path = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
+
 else: # Just for local testing... 
-    FAST_exe = 'openfast_dev'
-    Turbsim_exe = 'turbsim_dev'
+    FAST_exe = '/Users/nabbas/openfast/install/bin/openfast_single'
+    Turbsim_exe = '/Users/nabbas/openfast/install/bin/turbsim_single'
     cores = 4
     FAST_directory = '/Users/nabbas/Documents/WindEnergyToolbox/ROSCO_toolbox/Test_Cases/5MW_Land_DLL_WTurb'
     FAST_InputFile = '5MW_Land_DLL_WTurb.fst'
-    if rosco:
-        dll_filename = '/Users/nabbas/Documents/TurbineModels/TurbineControllers/FortranControllers/ROSCO/build/libdiscon.dylib'   
-        PerfFile_path = '../5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
+    dll_filename = ['/Users/nabbas/Documents/TurbineModels/TurbineControllers/FortranControllers/ROSCO/build/libdiscon.dylib',
+                    '/Users/nabbas/Documents/TurbineModels/NREL_5MW/5MW_Baseline/ServoData/DISCON/build/DISCON.dll']
+    PerfFile_path = ['../5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt']
 
 # Output filepaths        
 if eagle: 
@@ -68,7 +69,7 @@ else:
 
 # DLC inputs
 DLCs = [1.1, 1.3]
-windspeeds = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20]
+windspeeds = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25]
 seeds = [54321, 12345]
 
 # Analysis time
@@ -81,7 +82,7 @@ else:
 Turbine_Class = 'I'  # I, II, III, IV
 Turbulence_Class = 'A'
 D = 126.
-z_hub = 87
+z_hub = 90
 
 # ================== THE ACTION ==================
 # Initialize iec
@@ -146,11 +147,9 @@ case_inputs = {}
 
 case_inputs[('Fst', 'OutFileFmt')] = {'vals': [2], 'group': 0}
 case_inputs[("Fst", "TMax")] = {'vals': [TMax], 'group': 0}
-case_inputs[('AeroDyn15', 'TwrAero')] = {'vals': [True], 'group': 0}
+case_inputs[('AeroDyn15', 'TwrAero')] = {'vals': ['True'], 'group': 0}
 
-case_inputs[('ServoDyn', 'DLL_FileName')] = {'vals': [dll_filename], 'group': 0}
-
-# case_inputs[('DISCON_in', 'PerfFileName')] = {'vals': [PerfFile_path], 'group': 0}
+case_inputs[('DISCON_in', 'PerfFileName')] = {'vals': [PerfFile_path], 'group': 0}
 
 if floating:
     case_inputs[('DISCON_in', 'PS_Mode')] = {'vals': [1], 'group': 0}
@@ -158,6 +157,8 @@ if floating:
 else:
     case_inputs[('DISCON_in', 'PS_Mode')] = {'vals': [0], 'group': 0}
     case_inputs[('DISCON_in', 'Fl_Mode')] = {'vals': [0], 'group': 0}
+
+case_inputs[('ServoDyn', 'DLL_FileName')] = {'vals': dll_filename, 'group': 2}
 
 # Naming, file management, etc
 iec.case_name_base = case_name_base
@@ -215,8 +216,42 @@ case_list, case_name_list = iec.execute(case_inputs=case_inputs)
 fastBatch.case_list = case_list
 fastBatch.case_name_list = case_name_list
 fastBatch.debug_level = debug_level
-
 if multi:
     fastBatch.run_multi()
 else:
     fastBatch.run_serial()
+
+
+# Save statistics
+if save_stats:
+    from BatchAnalysis import pdTools, Processing
+    fp = Processing.FAST_Processing()
+
+    # Find all outfiles
+    outfiles = []
+    for file in os.listdir(run_dir):
+        if file.endswith('.outb'):
+            print(file)
+            outfiles.append(os.path.join(run_dir, file))
+        elif file.endswith('.out'):
+            outfiles.append(os.path.join(run_dir, file))
+
+    outfiles = outfiles
+
+    # Set some processing parameters
+    fp.OpenFAST_outfile_list = outfiles
+    fp.namebase = case_name_base
+    fp.t0 = 30
+    fp.parallel_analysis = True
+    fp.results_dir = os.path.join(run_dir,'stats')
+    fp.verbose = True
+
+    fp.save_LoadRanking = True
+    fp.save_SummaryStats = True
+
+    # Load and save statistics and load rankings
+    stats, load_rankings = fp.batch_processing()
+
+
+
+

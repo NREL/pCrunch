@@ -31,10 +31,25 @@ class Loads_Analysis(object):
     def __init__(self, **kwargs):
 
         # Analysis time range
-        self.t0 = 0
-        self.tf = 1000000
+        self.t0 = None
+        self.tf = None
         # Desired channels for analysis
         self.channel_list = []
+
+        # Load Ranking 
+        self.ranking_vars = [["RotSpeed"],
+                             ["TipDxc1", "TipDxc2", "TipDxc3"],
+                             ["TipDyc1", "TipDyc2", "TipDyc3"],
+                             ['RootMyb1', 'RootMyb2', 'RootMyb3'],
+                             ['RootMxb1', 'RootMxb2', 'RootMxb3'],
+                             ['TwrBsFyt']
+                             ]  # List of lists
+        self.ranking_stats = ['max',
+                              'max',
+                              'max',
+                              'max',
+                              'max',
+                              ]  # should be same length as ranking_vars
 
         # verbose?
         self.verbose=False
@@ -148,7 +163,7 @@ class Loads_Analysis(object):
         return sum_stats
 
 
-    def load_ranking(self, stats, ranking_stats, ranking_vars, names=[], get_df=False):
+    def load_ranking(self, stats, names=[], get_df=False):
         '''
         Find load rankings for desired signals
 
@@ -188,10 +203,13 @@ class Loads_Analysis(object):
         if not names:
             names = list(stats_df.columns.levels[0])
 
+        if self.verbose:
+            print('Calculating load rankings.')
+            
         # Column names to search in stats_df
         #  - [name, variable, stat],  i.e.['DLC1.1','TwrBsFxt','max']
         cnames = [pd.MultiIndex.from_product([names, var, [stat]])
-                for var, stat in zip(ranking_vars, ranking_stats)]
+                for var, stat in zip(self.ranking_vars, self.ranking_stats)]
 
         rank__ascending = False
         # Collect load rankings
@@ -201,7 +219,7 @@ class Loads_Analysis(object):
             mi_name = list(col.levels[0])
             mi_stat = col.levels[2]  # length = 1
             mi_idx = col.levels[2][0] + '_case_idx'
-            if len(col.levels[1]) > 0:
+            if len(col.levels[1]) > 1:
                 mi_var = [col.levels[1][0][:-1]]
             else:
                 mi_var = list(col.levels[1])
@@ -255,8 +273,8 @@ class Power_Production(object):
     Class to generate power production stastics
     '''
     def __init__(self, **kwargs):
-        # Wind speeds to analyse power production over
-        self.windspeeds=[]
+        # Turbine parameters
+        self.turbine_class = 2
 
         for k, w in kwargs.items():
             try:
@@ -266,40 +284,48 @@ class Power_Production(object):
 
         super(Power_Production, self).__init__()
 
-    def gen_windPDF(self, Vavg, bnums, Vrange):
+    def prob_WindDist(self, windspeed, disttype='pdf'):
         ''' 
-        Generates a probability vector by finding the difference between bin edges using a Rayleigh
-        wind distribution with shape factor = 2. Note this method differs slightly from IEC standard, but results end
-        up being very close especially with higher resolution
+        Generates the probability of a windspeed given the cumulative distribution or probability
+        density function of a Weibull distribution per IEC 61400.
+
+        NOTE: This uses the range of wind speeds simulated over, so if the simulated wind speed range
+        is not indicative of operation range, using this cdf to calculate AEP is invalid
         
         Parameters:
         -----------
-        Vavg: float
-            average wind speed of the site 
-        bnums: int
-            number of bins within brange
-        Vrange: list
-            range of wind speeds being considered, ie. [2,26]
-        
+        windspeed: float or list-like
+            wind speed(s) to calculate probability of 
+        disttype: str, optional      
+            type of probability, currently supports CDF or PDF
         Outputs:
         ----------
         p_bin: list
             list containing probabilities per wind speed bin 
         '''
-        # Check for windspeeds
-        if not len(self.windspeeds):
-            raise ValueError('Power_Production.windspeeds must be defined for any power production analysis!')
+        if self.turbine_class == 1:
+            Vavg = 50 * 0.2
+        elif self.turbine_class == 2:
+            Vavg = 42.5 * 0.2
+        elif self.turbine_class == 3:
+            Vavg = 37.5 * 0.2
 
-        _, edges = np.histogram(self.windspeeds, bins=bnums, range=Vrange)
-        #centers = edges[:-1] + np.diff(edges) / 2.
-        self.p_bin = []
-        for x in range(1, len(edges)):
-            self.p_bin.append(np.exp(-np.pi*(edges[x-1]/(2*Vavg)) **
-                                2)-np.exp(-np.pi*(edges[x]/(2*Vavg))**2))
+        # Define parameters
+        k = 2 # Weibull shape parameter
+        c = (2 * Vavg)/np.sqrt(np.pi) # Weibull scale parameter 
+
+        if disttype.lower() == 'cdf':
+            # Calculate probability of wind speed based on WeibulCDF
+            wind_prob = 1 - np.exp(-(windspeed/c)**k)
+        elif disttype.lower() == 'pdf':
+            # Calculate probability of wind speed based on WeibulPDF
+            wind_prob = (k/c) * (windspeed/c)**(k-1) * np.exp(-(windspeed/c)**k)
+        else:
+            raise ValueError('The {} probability distribution type is invalid'.format(disttype))
         
-        return self.p_bin
+        return wind_prob
 
-    def AEP(self, stats):
+    def AEP(self, stats, windspeeds, disttype='pdf'):
         '''
         Get AEPs for simulation cases
 
@@ -310,30 +336,46 @@ class Power_Production(object):
         stats: dict, list, pd.DataFrame
             Dict (single case), list(multiple cases), df(single or multiple cases) containing
             summary statistics. 
+        windspeeds: list-like
+            List of wind speed values corresponding to each power output in the stats input 
+            for a single dataset
+        disttype: str, optional      
+            type of probability, currently supports CDF or PDF
 
         Returns:
         --------
         AEP: List
             Annual energy production corresponding to 
         '''
-        # Check for wind speeds
-        if not isinstance(self.p_bin, list):
-            raise ValueError('Wind speed probabilities do not exist, run gen_WindPDF before AEP.')
-        
+  
         # Make sure stats is in pandas df
         if isinstance(stats, dict):
             stats_df = pdTools.dict2df(stats)
         elif isinstance(stats, list):
             stats_df = pdTools.dict2df(stats)
-        elif not isinstance(stats, pd.DataFrame):
+        elif isinstance(stats, pd.DataFrame):
+            stats_df = stats
+        else: 
             raise TypeError('Input stats is must be a dictionary, list, or pd.DataFrame containing OpenFAST output statistics.')
+
+        # Check windspeed length
+        if len(windspeeds) == len(stats_df):
+            ws = windspeeds
+        elif int(len(windspeeds)/len(stats_df.columns.levels[0])) == len(stats_df):
+            ws = windspeeds[0:len(stats_df)]
+            print('WARNING: Assuming the input windspeed array is duplicated for each dataset.')
+        else:
+            raise ValueError(
+                'Length of windspeeds is not the correct length for the input statistics.')
+
+        wind_prob = self.prob_WindDist(ws, disttype=disttype)
 
         if 'GenPwr' in stats_df.columns.levels[0]:
             pwr_array = np.array(stats_df.loc[:, ('GenPwr', 'mean')])
-            AEP = np.matmul(pwr_array.T, self.p_bin) * 8760
+            AEP = np.matmul(pwr_array.T, wind_prob) * 8760
         elif 'GenPwr' in stats_df.columns.levels[1]:
-            pwr_array = np.array(stats_df.loc[:, (slice(None), 'GenPwr', 'mean')])
-            AEP = np.matmul(pwr_array.T, self.p_bin) * 8760
+            pwr_array = stats_df.loc[:, (slice(None), 'GenPwr', 'mean')].to_numpy()
+            AEP = np.matmul(pwr_array.T, wind_prob) * 8760
         else:
             raise ValueError("('GenPwr','Mean') does not exist in the input statistics.")
 

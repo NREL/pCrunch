@@ -37,8 +37,8 @@ class FAST_Processing(object):
         self.verbose = False            # True/False; Enable/Disable non-error message outputs to screen
 
         # Analysis Options
-        self.t0 = 0.       # float>=0    ; start time to include in analysis
-        self.tf = 10000  # float>=0,-1 ; end time to include in analysis
+        self.t0 = None       # float>=0    ; start time to include in analysis
+        self.tf = None  # float>=0,-1 ; end time to include in analysis
 
         # Load ranking
         self.ranking_vars = [   ["RotSpeed"], 
@@ -71,7 +71,7 @@ class FAST_Processing(object):
         if self.parallel_analysis:
             # Make sure multi-processing cores are valid
             if not self.parallel_cores:
-                self.parallel_cores = min(mp.cpu_count(), len(filenames))
+                self.parallel_cores = mp.cpu_count()
             elif self.parallel_cores == 1:
                 self.parallel_analysis = False
 
@@ -117,24 +117,29 @@ class FAST_Processing(object):
         # Do we have a list of data?
         N = len(self.OpenFAST_outfile_list)
         if N == 0:
-            print('Output files not defined! Populate: "FastPost.OpenFAST_outfile_list"')
-            print('Quitting FastPost analysis')
-            exit()
+            raise ValueError('Output files not defined! Populate: "FastPost.OpenFAST_outfile_list". \n Quitting FAST_Processing.')
+            
 
         # Do all the files exist?
         files_exist = True
         for i, flist in enumerate(self.OpenFAST_outfile_list):
-            for fname in flist:
-                if not os.path.exists(fname):
-                    files_exist = False
-                    if len(self.dataset_names) > 0:
-                        print('Warning! File "{}" from {} does not exist.'.format(
-                            fname, self.dataset_names[i]))
-                        flist.remove(fname)
-                    else:
-                        print('Warning! File "{}" from dataset {} of {} does not exist.'.format(
-                              fname, i+1, N))
-                        flist.remove(fname)
+            if isinstance(flist, str):
+                if not os.path.exists(flist):
+                    print('Warning! File "{}" does not exist.'.format(
+                        flist))
+                    self.OpenFAST_outfile_list.remove(flist)
+            elif isinstance(flist, list):
+                for fname in flist:
+                    if not os.path.exists(fname):
+                        files_exist = False
+                        if len(self.dataset_names) > 0:
+                            print('Warning! File "{}" from {} does not exist.'.format(
+                                fname, self.dataset_names[i]))
+                            flist.remove(fname)
+                        else:
+                            print('Warning! File "{}" from dataset {} of {} does not exist.'.format(
+                                fname, i+1, N))
+                            flist.remove(fname)
 
         # # load case matrix data to get descriptive case naming
         # if self.fname_case_matrix == '':
@@ -152,7 +157,11 @@ class FAST_Processing(object):
                                      '_', '-']]).rstrip() for i, name in zip(range(N), self.dataset_names)]
         elif len(self.OpenFAST_outfile_list) > 0:
             # use out file naming
-            self.namebase = ['_'.join(os.path.split(flist[0])[1].split('_')[:-1])
+            if isinstance(self.OpenFAST_outfile_list[0], list):
+                self.namebase = ['_'.join(os.path.split(flist[0])[1].split('_')[:-1])
+                             for flist in self.OpenFAST_outfile_list]
+            else:
+                self.namebase = ['_'.join(os.path.split(flist)[1].split('_')[:-1])
                              for flist in self.OpenFAST_outfile_list]
         
         # check that names are unique
@@ -160,10 +169,14 @@ class FAST_Processing(object):
             self.namebase = []
         # as last resort, give generic name
         if not self.namebase:
-            self.namebase = ['dataset' + ('{}'.format(i)).zfill(len(str(N-1))) for i in range(N)]
+            if isinstance(self.OpenFAST_outfile_list[0], str):
+                # Just one dataset name for single dataset
+                self.namebase = ['dataset1']
+            else:
+                self.namebase = ['dataset' + ('{}'.format(i)).zfill(len(str(N-1))) for i in range(N)]
         
         # Run design comparison if filenames list has multiple lists
-        if (len(self.OpenFAST_outfile_list) > 1) and (isinstance(self.OpenFAST_outfile_list, list)): 
+        if (len(self.OpenFAST_outfile_list) > 1) and (isinstance(self.OpenFAST_outfile_list[0], list)): 
             # Load stats and load rankings for design comparisons
             stats, load_rankings = self.design_comparison(self.OpenFAST_outfile_list, verbose=self.verbose)
         
@@ -186,34 +199,48 @@ class FAST_Processing(object):
                 pool.join()
 
                 # Re-sort into the more "standard" dictionary/dataframe format we like
-                stats_df = pdTools.dict2df(stats_separate)
-                stats_df = stats_df.stack().stack()
-                stats_df = stats_df.swaplevel(1, 2).T.reset_index(drop=True).sort_index(axis=1)
-                stats = pdTools.df2dict(stats_df)
+                stats = [pdTools.dict2df(ss).unstack() for ss in stats_separate]
+                dft = pd.DataFrame(stats)
+                dft = dft.reorder_levels([2, 0, 1], axis=1).sort_index(axis=1, level=0)
+                stats = pdTools.df2dict(dft)
 
                 # Get load rankings after stats are loaded
-                load_rankings = loads_analysis.load_ranking(stats, self.ranking_stats, self.ranking_vars,
+                load_rankings = loads_analysis.load_ranking(stats,
                                             names=self.dataset_names, get_df=False)
            
             # run analysis in serial
             else:
+                # Initialize Analysis
+                loads_analysis = Analysis.Loads_Analysis()
+                loads_analysis.verbose = self.verbose
+                loads_analysis.t0 = self.t0
+                loads_analysis.tf = self.tf
+
                 stats, load_rankings = loads_analysis.full_loads_analysis(self.OpenFAST_outfile_list, get_load_ranking=True)
 
         if self.save_SummaryStats:
             if isinstance(stats, dict):
                 fname = self.namebase[0] + '_stats.yaml'
+                if self.verbose:
+                    print('Saving {}'.format(fname))
                 save_yaml(self.results_dir, fname, stats)
             else:
                 for namebase, st in zip(self.namebase, stats):
                     fname = namebase + '_stats.yaml'
+                    if self.verbose:
+                        print('Saving {}'.format(fname))
                     save_yaml(self.results_dir, fname, st)
         if self.save_LoadRanking:
             if isinstance(load_rankings, dict):
                 fname = self.namebase[0] + '_LoadRanking.yaml'
+                if self.verbose:
+                    print('Saving {}'.format(fname))
                 save_yaml(self.results_dir, fname, load_rankings)
             else:
                 for namebase, lr in zip(self.namebase, load_rankings):
                     fname = namebase + '_LoadRanking.yaml'
+                    if self.verbose:
+                        print('Saving {}'.format(fname))
                     save_yaml(self.results_dir, fname, lr)
 
 
@@ -248,11 +275,10 @@ class FAST_Processing(object):
         loads_analysis.verbose=self.verbose
         loads_analysis.t0 = self.t0
         loads_analysis.tf = self.tf
+        loads_analysis.ranking_vars = self.ranking_vars
+        loads_analysis.ranking_stats = self.ranking_stats
 
         if self.parallel_analysis: # run analysis in parallel
-            # Make sure multi-processing cores are valid
-            if not self.parallel_cores:
-                self.parallel_cores = min(mp.cpu_count(), len(filenames))
             # run analysis
             pool = mp.Pool(self.parallel_cores)
             stats_separate = pool.map(partial(loads_analysis.full_loads_analysis, get_load_ranking=False), fnames)
@@ -260,24 +286,26 @@ class FAST_Processing(object):
             pool.join()
         
             # Re-sort into the more "standard" dictionary/dataframe format we like
-            stats_df = pdTools.dict2df(stats_separate)
-            stats_df = stats_df.stack().stack()
-            stats_df = stats_df.swaplevel(1, 2).T.reset_index(drop=True).sort_index(axis=1)
-            stats = pdTools.df2dict(stats_df) 
+            stats = [pdTools.dict2df(ss).unstack() for ss in stats_separate]
+            dft = pd.DataFrame(stats)
+            dft = dft.reorder_levels([2, 0, 1], axis=1).sort_index(axis=1, level=0)
+            stats = pdTools.df2dict(dft)
 
             # Get load rankings after stats are loaded
-            load_rankings = loads_analysis.load_ranking(stats, self.ranking_stats, self.ranking_vars, 
-                                                        names=self.dataset_names, get_df=False)
+            load_rankings = loads_analysis.load_ranking(stats) 
 
         else: # run analysis in serial
             stats = []
+            load_rankings = []
             for file_sets in filenames:
-                stats, load_rankings, stats.append(loads_analysis.full_loads_analysis(file_sets, get_load_ranking=False))
+                st, lr = loads_analysis.full_loads_analysis(file_sets, get_load_ranking=True)
+                stats.append(st)
+                load_rankings.append(lr)
+            
 
 
 
         return stats, load_rankings
-        # _, _, fast_data = fast_io.load_FAST_out(filenames, tmin=t0, tmax=tf)
 
 def get_windspeeds(case_matrix, return_df=False):
     '''

@@ -12,7 +12,7 @@ from wisdem.aeroelasticse.Util import FileTools
 from ROSCO_toolbox import controller as ROSCO_controller
 from ROSCO_toolbox import turbine as ROSCO_turbine
 from ROSCO_toolbox import utilities as ROSCO_utilities
-import CaseGen_Control
+from BatchAnalysis import CaseGen_Control
 
 # FLAGS
 eagle = True
@@ -20,23 +20,23 @@ multi = True
 
 # Controller tuning yaml
 if eagle:
-    parameter_filename = '../../TurbineModels/ControllerYamls/BAR.yaml'
+    parameter_filename = '/home/nabbas/Documents/TurbineModels/ControllerYamls/BAR.yaml'
 else: 
     parameter_filename = '../../Turbine_Tuning/BAR/BAR.yaml'
 
 # Generate case inputs for control related stuff
 input_params = ['zeta_flp', 'omega_flp']
 DISCON_params = ['Flp_Kp', 'Flp_Ki']
-# values = [[0.7, 0.8], [3.0]]
-values = [np.around(np.arange(0.7, 1.1, 0.02),      decimals=3),  # use np.around to avoid precision issues
-          np.around(np.arange(1.0, 3.0, 0.1) ,      decimals=3)]
+# values = [[0.7], [2.73]]
+values = [np.around(np.arange(0.7, 1.1, 0.05),      decimals=3),  # use np.around to avoid precision issues
+          np.around(np.arange(2.65, 2.85, 0.01) ,      decimals=3)]
 group = 1
 
 # Some path specifics/
 if eagle:
     FAST_InputFile = 'BAR_15p_8s_0.fst'    # FAST input file (ext=.fst)
     FAST_directory = '/projects/bar/nabbas/TurbineModels/BAR_15p_8s'
-    FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep'
+    FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep2'
     wind_dir = '/projects/bar/nabbas/TurbineModels/wind'
     dll_filename = '/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so'
     Turbsim_exe = 'turbsim'
@@ -48,15 +48,15 @@ else:
     wind_dir = '/Users/nabbas/Documents/TurbineModels/BAR/wind'
     dll_filename = '/Users/nabbas/Documents/TurbineModels/TurbineControllers/FortranControllers/ROSCO/build/libdiscon.dylib'
     Turbsim_exe = 'turbsim_dev'
-    FAST_exe = 'openfast_flap'
+    FAST_exe = 'openfast_dev'
 
-case_name_base = 'testing'
+case_name_base = 'BAR_15p_8s'
 debug_level = 2
 
 
 # Wind
 WindType = [3]
-Uref = [12.0]
+Uref = [10.0]
 
 # Time
 TMax = 330
@@ -83,11 +83,13 @@ cgc.D = D
 cgc.z_hub = z_hub
 cgc.debug_level = debug_level
 
+cgc.overwrite = True
 # Generate wind speeds
-# cgc.seed = 143
+cgc.seed = 1
 cgc.wind_dir = wind_dir
 cgc.Turbsim_exe = Turbsim_exe
 wind_file, wind_file_type = cgc.gen_turbwind(Uref)
+
 
 # Generate control case inputs
 # NOTE: Usually, group=1 is easiest. Then some baseline characteristics in group 0, etc...
