@@ -25,26 +25,25 @@ if eagle:
     if floating:
         FAST_directory = '/projects/ssc/nabbas/TurbineModels/5MW_OC3Spar_DLL_WTurb_WavesIrr'
         FAST_InputFile = '5MW_OC3Spar_DLL_WTurb_WavesIrr.fst'
+        dll_filename = ['/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so',
+                        '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON_OC3/build/DISCON_OC3Hywind.dll']
     else:
         FAST_directory = '/projects/ssc/nabbas/TurbineModels/5MW_Land_DLL_WTurb'  
         FAST_InputFile = '5MW_Land_DLL_WTurb.fst'  
-    if rosco:
-        dll_filename = '/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so'
-        PerfFile_path = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
-    else:
-        if floating:
-            dll_filename = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON_OC3/build/DISCON_OC3Hywind.dll'
-        else:
-            dll_filename = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON/build/DISCON.dll'
+        dll_filename = ['/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so',
+                        '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/ServoData/DISCON/build/DISCON.dll']
+
+    PerfFile_path = '/projects/ssc/nabbas/TurbineModels/5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
+
 else: # Just for local testing... 
-    FAST_exe = '/Users/nabbas/openfast/install/bin/openfast_dev'
-    Turbsim_exe = '/Users/nabbas/openfast/install/bin/turbsim_dev'
+    FAST_exe = '/Users/nabbas/openfast/install/bin/openfast_single'
+    Turbsim_exe = '/Users/nabbas/openfast/install/bin/turbsim_single'
     cores = 4
     FAST_directory = '/Users/nabbas/Documents/WindEnergyToolbox/ROSCO_toolbox/Test_Cases/5MW_Land_DLL_WTurb'
     FAST_InputFile = '5MW_Land_DLL_WTurb.fst'
-    if rosco:
-        dll_filename = '/Users/nabbas/Documents/TurbineModels/TurbineControllers/FortranControllers/ROSCO/build/libdiscon.dylib'   
-        PerfFile_path = '../5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt'
+    dll_filename = ['/Users/nabbas/Documents/TurbineModels/TurbineControllers/FortranControllers/ROSCO/build/libdiscon.dylib',
+                    '/Users/nabbas/Documents/TurbineModels/NREL_5MW/5MW_Baseline/ServoData/DISCON/build/DISCON.dll']
+    PerfFile_path = ['../5MW_Baseline/Cp_Ct_Cq.OpenFAST5MW.txt']
 
 # Output filepaths        
 if eagle: 
@@ -83,7 +82,7 @@ else:
 Turbine_Class = 'I'  # I, II, III, IV
 Turbulence_Class = 'A'
 D = 126.
-z_hub = 87
+z_hub = 90
 
 # ================== THE ACTION ==================
 # Initialize iec
@@ -148,11 +147,9 @@ case_inputs = {}
 
 case_inputs[('Fst', 'OutFileFmt')] = {'vals': [2], 'group': 0}
 case_inputs[("Fst", "TMax")] = {'vals': [TMax], 'group': 0}
-case_inputs[('AeroDyn15', 'TwrAero')] = {'vals': [True], 'group': 0}
+case_inputs[('AeroDyn15', 'TwrAero')] = {'vals': ['True'], 'group': 0}
 
-case_inputs[('ServoDyn', 'DLL_FileName')] = {'vals': [dll_filename], 'group': 0}
-
-# case_inputs[('DISCON_in', 'PerfFileName')] = {'vals': [PerfFile_path], 'group': 0}
+case_inputs[('DISCON_in', 'PerfFileName')] = {'vals': [PerfFile_path], 'group': 0}
 
 if floating:
     case_inputs[('DISCON_in', 'PS_Mode')] = {'vals': [1], 'group': 0}
@@ -160,6 +157,8 @@ if floating:
 else:
     case_inputs[('DISCON_in', 'PS_Mode')] = {'vals': [0], 'group': 0}
     case_inputs[('DISCON_in', 'Fl_Mode')] = {'vals': [0], 'group': 0}
+
+case_inputs[('ServoDyn', 'DLL_FileName')] = {'vals': dll_filename, 'group': 2}
 
 # Naming, file management, etc
 iec.case_name_base = case_name_base
@@ -242,7 +241,7 @@ if save_stats:
     # Set some processing parameters
     fp.OpenFAST_outfile_list = outfiles
     fp.namebase = case_name_base
-    fp.t0 = 1
+    fp.t0 = 30
     fp.parallel_analysis = True
     fp.results_dir = os.path.join(run_dir,'stats')
     fp.verbose = True
