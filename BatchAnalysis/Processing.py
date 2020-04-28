@@ -178,7 +178,7 @@ class FAST_Processing(object):
         # Run design comparison if filenames list has multiple lists
         if (len(self.OpenFAST_outfile_list) > 1) and (isinstance(self.OpenFAST_outfile_list[0], list)): 
             # Load stats and load rankings for design comparisons
-            stats, load_rankings = self.design_comparison(self.OpenFAST_outfile_list, verbose=self.verbose)
+            stats, load_rankings = self.design_comparison(self.OpenFAST_outfile_list)
         
         else:
             # Initialize Analysis

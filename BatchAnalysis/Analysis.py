@@ -325,7 +325,7 @@ class Power_Production(object):
         
         return wind_prob
 
-    def AEP(self, stats, windspeeds, disttype='pdf'):
+    def AEP(self, stats, windspeeds):
         '''
         Get AEPs for simulation cases
 
@@ -339,8 +339,6 @@ class Power_Production(object):
         windspeeds: list-like
             List of wind speed values corresponding to each power output in the stats input 
             for a single dataset
-        disttype: str, optional      
-            type of probability, currently supports CDF or PDF
 
         Returns:
         --------
@@ -368,16 +366,23 @@ class Power_Production(object):
             raise ValueError(
                 'Length of windspeeds is not the correct length for the input statistics.')
 
-        wind_prob = self.prob_WindDist(ws, disttype=disttype)
-
+        # load power array
         if 'GenPwr' in stats_df.columns.levels[0]:
             pwr_array = np.array(stats_df.loc[:, ('GenPwr', 'mean')])
-            AEP = np.matmul(pwr_array.T, wind_prob) * 8760
         elif 'GenPwr' in stats_df.columns.levels[1]:
-            pwr_array = stats_df.loc[:, (slice(None), 'GenPwr', 'mean')].to_numpy()
-            AEP = np.matmul(pwr_array.T, wind_prob) * 8760
+            pwr_array = stats_df.loc[:, (slice(None), 'GenPwr', 'mean')]
         else:
             raise ValueError("('GenPwr','Mean') does not exist in the input statistics.")
+        
+        # group and average powers by wind speeds
+        pwr_array['windspeeds'] = ws 
+        pwr_array = pwr_array.groupby('windspeeds').mean() 
+        # find set of wind speeds
+        ws_set = list(set(ws))
+        # wind probability
+        wind_prob = self.prob_WindDist(ws_set, disttype='pdf')
+        # Calculate AEP
+        AEP = np.trapz(pwr_array.T *  wind_prob, ws_set) * 8760
 
         return AEP
 
