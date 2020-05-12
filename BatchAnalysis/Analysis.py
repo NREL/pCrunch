@@ -448,7 +448,7 @@ class wsPlotting(object):
         elif plotvar in stats_df.columns.levels[1]:
             sdf = stats_df.loc[:, (slice(None), plotvar, slice(None))].droplevel([1], axis=1)
         else:
-            raise ValueError("('GenPwr','Mean') does not exist in the input statistics.")
+            raise ValueError("{} does not exist in the input statistics.".format(plotvar))
         
         # Add windspeeds to data
         sdf['WindSpeeds']= ws
