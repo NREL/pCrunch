@@ -370,3 +370,28 @@ def get_windspeeds(case_matrix, return_df=False):
     
     else:
         return windspeed, seed, IECtype
+
+
+def save_yaml(outdir, fname, data_out):
+    ''' Save yaml file - this is just ripped from WISDEM 
+    
+    Parameters:
+    -----------
+    outdir: str
+        directory to save yaml
+    fname: str
+        filename for yaml
+    data_out: dict
+        data to dump to yaml
+    '''
+    fname = os.path.join(outdir, fname)
+
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+
+    f = open(fname, "w")
+    yaml = ry.YAML()
+    yaml.default_flow_style = None
+    yaml.width = float("inf")
+    yaml.indent(mapping=4, sequence=6, offset=3)
+    yaml.dump(data_out, f)
