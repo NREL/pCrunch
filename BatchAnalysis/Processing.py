@@ -3,17 +3,22 @@ import os, sys, time, shutil
 from functools import partial
 import multiprocessing as mp
 import numpy as np
-import ruamel_yaml as ry
+import yaml
+try:
+    import ruamel_yaml as ry
+except:
+    try:
+        import ruamel.yaml as ry
+    except:
+        raise ImportError('No module named ruamel.yaml or ruamel_yaml')
+
 import matplotlib.pyplot as plt
 import pandas as pd
 
 from ROSCO_toolbox.utilities import FAST_IO
 
 from BatchAnalysis import Analysis, pdTools
-def post_process():
-    '''
-    Function to run batch post processing. 
-    '''
+
 
 class FAST_Processing(object):
     '''
@@ -369,7 +374,7 @@ def get_windspeeds(case_matrix, return_df=False):
 
 
 def save_yaml(outdir, fname, data_out):
-    ''' Save yaml file - this is just ripped from WISDEM 
+    ''' Save yaml file - ripped from WISDEM 
     
     Parameters:
     -----------
@@ -391,3 +396,26 @@ def save_yaml(outdir, fname, data_out):
     yaml.width = float("inf")
     yaml.indent(mapping=4, sequence=6, offset=3)
     yaml.dump(data_out, f)
+
+
+def load_yaml(fname_input, package=0):
+    ''' Import a .yaml file - ripped from WISDEM
+
+    Parameters:
+    -----------
+    fname_input: str
+        yaml file to load
+    package: bool
+        0 = yaml, 1 = ruamel
+
+    if package == 0:
+        with open(fname_input) as f:
+            data = yaml.safe_load(f)
+        return data
+
+    elif package == 1:
+        with open(fname_input, 'r') as myfile:
+            text_input = myfile.read()
+        myfile.close()
+        ryaml = ry.YAML()
+        return dict(ryaml.load(text_input))

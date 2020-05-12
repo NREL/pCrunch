@@ -2,7 +2,7 @@
 Some tools to ease management of batch analysis data in pandas
 '''
 import pandas as pd
-from wisdem.aeroelasticse.Util import FileTools
+from BatchAnalysis import Processing
 
 def dict2df(sumstats, names=None):
     '''
@@ -77,7 +77,7 @@ def yaml2df(filename, names=[]):
 
     '''
 
-    data_dict = FileTools.load_yaml('test.yaml', package=0)
+    data_dict = Processing.load_yaml('test.yaml', package=0)
 
     level = data_dict
     li = 0 # level index
