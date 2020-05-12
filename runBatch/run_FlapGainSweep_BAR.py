@@ -12,11 +12,11 @@ from wisdem.aeroelasticse.Util import FileTools
 from ROSCO_toolbox import controller as ROSCO_controller
 from ROSCO_toolbox import turbine as ROSCO_turbine
 from ROSCO_toolbox import utilities as ROSCO_utilities
-from BatchAnalysis import CaseGen_Control
+from BatchAnalysis import CaseGen_Control, Analysis, Processing
 
 # FLAGS
 eagle = True
-multi = True
+multi = False
 
 # Controller tuning yaml
 if eagle:
@@ -28,15 +28,15 @@ else:
 input_params = ['zeta_flp', 'omega_flp']
 DISCON_params = ['Flp_Kp', 'Flp_Ki']
 # values = [[0.7], [2.73]]
-values = [np.around(np.arange(0.7, 1.1, 0.05),      decimals=3),  # use np.around to avoid precision issues
-          np.around(np.arange(2.65, 2.85, 0.01) ,      decimals=3)]
+values = [np.around(np.arange(0.5, 2.5, 0.05),      decimals=3),  # use np.around to avoid precision issues
+          np.around(np.arange(2.2, 3.5, 0.05) ,      decimals=3)]
 group = 1
 
 # Some path specifics/
 if eagle:
-    FAST_InputFile = 'BAR_15p_8s_0.fst'    # FAST input file (ext=.fst)
-    FAST_directory = '/projects/bar/nabbas/TurbineModels/BAR_15p_8s'
-    FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep2'
+    FAST_InputFile = 'BAR_10p_75s.fst'    # FAST input file (ext=.fst)
+    FAST_directory = '/projects/bar/nabbas/TurbineModels/BAR_10p_75s'
+    FAST_runDirectory = '/projects/bar/nabbas/batch_GainSweep_10p_75s_2'
     wind_dir = '/projects/bar/nabbas/TurbineModels/wind'
     dll_filename = '/home/nabbas/ROSCO_toolbox/ROSCO/build/libdiscon.so'
     Turbsim_exe = 'turbsim'
@@ -50,13 +50,14 @@ else:
     Turbsim_exe = 'turbsim_dev'
     FAST_exe = 'openfast_dev'
 
-case_name_base = 'BAR_15p_8s'
+case_name_base = 'BAR_10p_75s'
 debug_level = 2
 
 
 # Wind
 WindType = [3]
-Uref = [10.0]
+Uref = [8.25, 10.25]
+seeds = [13428, 1524]
 
 # Time
 TMax = 330
@@ -85,7 +86,7 @@ cgc.debug_level = debug_level
 
 cgc.overwrite = True
 # Generate wind speeds
-cgc.seed = 1
+cgc.seeds = seeds
 cgc.wind_dir = wind_dir
 cgc.Turbsim_exe = Turbsim_exe
 wind_file, wind_file_type = cgc.gen_turbwind(Uref)
@@ -169,3 +170,19 @@ if multi:
     # fastBatch.run_mpi()
 else:
     fastBatch.run_serial()
+
+
+
+# Post processing
+case_info = FileTools.load_yaml(FAST_runDirectory + '/case_matrix.yaml', package=1)
+outfiles = [FAST_runDirectory + fname + '.outb' for fname in case_info['Case_Name']]
+
+fp = Processing.FAST_Processing()
+fp.OpenFAST_outfile_list = outfiles
+fp.t0 = 30
+fp.parallel_analysis = True
+fp.verbose=True
+fp.results_dir = os.path.join(run_dir,'stats')    
+fp.save_LoadRanking = True
+fp.save_SummaryStats = True
+stats, load_ranking = fp.batch_processing()
