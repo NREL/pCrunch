@@ -352,14 +352,12 @@ def get_windspeeds(case_matrix, return_df=False):
         elif 'ECD' in fname:
             obj = fname.split('U')[-1].split('.wnd')
             windspeed.append(float(obj[0]))
-            obj2 = fname.split('ECD_')[-1].split('_U')
-            seed.append(float(obj2[0]))
+            seed.append([])
             IECtype.append('ECD')
         elif 'EWS' in fname:
             obj = fname.split('U')[-1].split('.wnd')
             windspeed.append(float(obj[0]))
-            obj2 = fname.split('EWS_')[-1].split('_U')
-            seed.append(float(obj2[0]))
+            seed.append([])
             IECtype.append('EWS')
         
     if return_df:
