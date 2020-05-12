@@ -16,4 +16,4 @@ N=36
 
 . /home/nabbas/Documents/batch_scripts/init_batch-env.sh
 
-python3 /home/nabbas/Documents/BatchAnalysis/BatchAnalysis/run_DLC_NREL5MW.py
+python3 /home/nabbas/Documents/pCrunch/runBatch/run_DLC_NREL5MW.py

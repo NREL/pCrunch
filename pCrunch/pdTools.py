@@ -2,7 +2,7 @@
 Some tools to ease management of batch analysis data in pandas
 '''
 import pandas as pd
-from BatchAnalysis import Processing
+from pCrunch import Processing
 
 def dict2df(sumstats, names=None):
     '''

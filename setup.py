@@ -25,9 +25,9 @@ from shutil import rmtree
 from setuptools import find_packages, setup, Command
 
 # Package meta-data.
-NAME = 'BatchAnalysis'
+NAME = 'pCrunch'
 DESCRIPTION = 'Some tools for batch analysis of OpenFAST runs'
-URL = 'https://github.com/nikhar-abbas/BatchAnalysis'
+URL = 'https://github.com/NREL/pCrunch'
 EMAIL = 'nikhar.abbas@nrel.gov'
 AUTHOR = 'Nikhar Abbas'
 REQUIRES_PYTHON = '>=3.4'

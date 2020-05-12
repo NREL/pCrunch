@@ -12,7 +12,7 @@ from wisdem.aeroelasticse.Util import FileTools
 from ROSCO_toolbox import controller as ROSCO_controller
 from ROSCO_toolbox import turbine as ROSCO_turbine
 from ROSCO_toolbox import utilities as ROSCO_utilities
-from BatchAnalysis import CaseGen_Control, Analysis, Processing
+from pCrunch import CaseGen_Control, Analysis, Processing
 
 # FLAGS
 eagle = True

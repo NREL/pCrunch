@@ -16,4 +16,4 @@ N=36
 
 . /home/nabbas/Documents/batch_scripts/init_batch-env.sh
 
-python3 /home/nabbas/Documents/BatchAnalysis/runBatch/run_FlapGainSweep_BAR.py
+python3 /home/nabbas/Documents/pCrunch/runBatch/run_FlapGainSweep_BAR.py

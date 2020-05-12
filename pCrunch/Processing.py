@@ -17,7 +17,7 @@ import pandas as pd
 
 from ROSCO_toolbox.utilities import FAST_IO
 
-from BatchAnalysis import Analysis, pdTools
+from pCrunch import Analysis, pdTools
 
 
 class FAST_Processing(object):
@@ -407,7 +407,7 @@ def load_yaml(fname_input, package=0):
         yaml file to load
     package: bool
         0 = yaml, 1 = ruamel
-
+    '''
     if package == 0:
         with open(fname_input) as f:
             data = yaml.safe_load(f)

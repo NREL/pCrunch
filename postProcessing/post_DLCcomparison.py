@@ -16,8 +16,8 @@ fast_pl = ROSCO_utilites.FAST_Plots()
 # WISDEM modules
 from wisdem.aeroelasticse.Util import FileTools
 # Batch Analysis
-from BatchAnalysis import pdTools
-from BatchAnalysis import Processing, Analysis
+from pCrunch import pdTools
+from pCrunch import Processing, Analysis
 
 
 # Define input files paths

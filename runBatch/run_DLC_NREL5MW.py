@@ -224,7 +224,7 @@ else:
 
 # Save statistics
 if save_stats:
-    from BatchAnalysis import pdTools, Processing
+    from pCrunch import pdTools, Processing
     fp = Processing.FAST_Processing()
 
     # Find all outfiles
