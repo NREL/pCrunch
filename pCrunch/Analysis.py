@@ -536,7 +536,29 @@ class wsPlotting(object):
     def plot_load_ranking(self, load_rankings, case_matrix, classifier_type, 
                         classifier_names=[], n_rankings=10, caseidx_labels=False):
         '''
-        case_matrix has to have wind speeds in it if you want to plot wrt wind speeds
+        Plot load rankings
+        
+        Parameters:
+        -----------
+        load_rankings: list, dict, or pd.DataFrame
+            Dict (single case), list(multiple cases), df(single or multiple cases) containing
+            load rankings. 
+        case_matrix: dict or pdDataFrame
+            Information mapping classifiers to load_rankings. 
+            NOTE: the case matrix must have wind speeds in ('InflowWind','WindSpeeds') if you 
+            wish to plot w.r.t. wind speed
+        classifier_type: tuple or str
+            classifier to denote load ranking cases. e.g. classifier_type=('IEC','DLC') will separate
+            the load rankings by DLC type, assuming the case matrix is properly set up to map each
+            DLC to the load ranking case
+        classifier_names: list, optional
+            Naming conventions for each classifier type for plotting purposes
+        n_rankings: int, optional
+            number of load rankings to plot
+        caseidx_labels: bool, optional
+            label x-axis with case index if True. If false, will try to plot with wind speed labels
+            if they exist, then fall abck to case indeces.  
+
         TODO: Save figs
         '''
 
