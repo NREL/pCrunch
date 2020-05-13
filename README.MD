@@ -29,5 +29,8 @@ A scripted implementation of a design comparison is provided postProcessing/post
 ## Contributing
 Please do! This should hopefully be a tool that many people can use and leverage regularly. I know that pretty much all of this could be improved, cleaned up, etc. Ideally, this is a fluid project that a few primary people are maintaining. 
 
+If you do contribute, please try to maintain the established conventions for commenting these codes (initial description of parameter and return values, reasonable in-line comments). 
+
+## And finally...
 Enjoy.
 
