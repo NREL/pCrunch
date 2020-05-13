@@ -132,7 +132,16 @@ class Loads_Analysis(object):
 
             # Process Data
             for channel in channel_list:
-                if channel != 'Time' and channel != 'meta' and channel in channel_list:
+                if channel == 'meta':
+                    if 'meta' not in sum_stats.keys():
+                        sum_stats['meta'] = {}
+                        sum_stats['meta']['name'] = []
+                        sum_stats['meta']['filename'] = []
+                    # save some meta data
+                    sum_stats['meta']['name'] = fd['meta']['name']
+                    sum_stats['meta']['filename'] = fd['meta']['filename']
+
+                elif channel != 'Time' and channel in channel_list:
                     try:
                         if channel not in sum_stats.keys():
                             sum_stats[channel] = {}
@@ -142,7 +151,7 @@ class Loads_Analysis(object):
                             sum_stats[channel]['mean'] = []
                             sum_stats[channel]['abs'] = []
                             sum_stats[channel]['integrated'] = []
-
+                        # calculate summary statistics
                         sum_stats[channel]['min'].append(float(min(fd[channel])))
                         sum_stats[channel]['max'].append(float(max(fd[channel])))
                         sum_stats[channel]['std'].append(float(np.std(fd[channel])))
