@@ -266,7 +266,7 @@ class Loads_Analysis(object):
         fast_data: list
             List of dictionaries containing openfast output data (returned from ROSCO_toolbox.FAST_IO.load_output)
         
-        chan_dict : list, tuple
+        chan_info : list, tuple
             tuple/list containing channel names to be analyzed and corresponding fatigue slope factor "m"
             ie. ('TwrBsFxt',4)
         
@@ -283,12 +283,12 @@ class Loads_Analysis(object):
         """
         # check data types
         assert isinstance(fast_data, (list)), 'fast_data must be of type list'
-        assert isinstance(chan_dict, (list,tuple)), 'chan_dict must be of type list or tuple'
+        assert isinstance(chan_info, (list,tuple)), 'chan_info must be of type list or tuple'
         assert isinstance(binNum, (float,int)), 'binNum must be of type float or int'
         assert isinstance(t, (float,int)), 't must be of type float or int'
 
         # create dictionary from chan_dict
-        dic = dict(chan_dict)
+        dic = dict(chan_info)
 
         # pre-allocate list
         dflist = []
