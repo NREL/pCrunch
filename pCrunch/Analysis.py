@@ -7,6 +7,7 @@ import ruamel_yaml as ry
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import fatpack # 3rd party module used for rainflow counting
 
 from ROSCO_toolbox.utilities import FAST_IO
 
@@ -258,7 +259,7 @@ class Loads_Analysis(object):
         else:
             return load_ranking
 
-    def get_DEL(self, fast_data, chan_dict, binNum=100, t=600):
+    def get_DEL(self, fast_data, chan_info, binNum=100, t=600):
         """ Calculates the short-term damage equivalent load of multiple variables
         
         Parameters: 
@@ -419,7 +420,8 @@ class Power_Production(object):
 
         # load power array
         if 'GenPwr' in stats_df.columns.levels[0]:
-            pwr_array = np.array(stats_df.loc[:, ('GenPwr', 'mean')])
+            pwr_array = stats_df.loc[:, ('GenPwr', 'mean')]
+            pwr_array = pwr_array.to_frame()
         elif 'GenPwr' in stats_df.columns.levels[1]:
             pwr_array = stats_df.loc[:, (slice(None), 'GenPwr', 'mean')]
         else:
