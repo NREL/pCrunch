@@ -7,6 +7,7 @@ import ruamel_yaml as ry
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import fatpack # 3rd party module used for rainflow counting
 
 from ROSCO_toolbox.utilities import FAST_IO
 
@@ -258,11 +259,66 @@ class Loads_Analysis(object):
         else:
             return load_ranking
 
-    def fatigue(self):
-        '''
-        Fatigue loads analysis
-        '''
-        pass
+    def get_DEL(self, fast_data, chan_info, binNum=100, t=600):
+        """ Calculates the short-term damage equivalent load of multiple variables
+        
+        Parameters: 
+        -----------
+        fast_data: list
+            List of dictionaries containing openfast output data (returned from ROSCO_toolbox.FAST_IO.load_output)
+        
+        chan_info : list, tuple
+            tuple/list containing channel names to be analyzed and corresponding fatigue slope factor "m"
+            ie. ('TwrBsFxt',4)
+        
+        binNum : int
+            number of bins for rainflow counting method (minimum=100)
+        
+        t : float/int
+            Used to control DEL frequency. Default for 1Hz is 600 seconds for 10min data
+        
+        Outputs:
+        -----------
+        dfDEL : pd.DataFrame
+            Damage equivalent load of each specified variable for one fast output file  
+        """
+        # check data types
+        assert isinstance(fast_data, (list)), 'fast_data must be of type list'
+        assert isinstance(chan_info, (list,tuple)), 'chan_info must be of type list or tuple'
+        assert isinstance(binNum, (float,int)), 'binNum must be of type float or int'
+        assert isinstance(t, (float,int)), 't must be of type float or int'
+
+        # create dictionary from chan_dict
+        dic = dict(chan_info)
+
+        # pre-allocate list
+        dflist = []
+
+        for fd in fast_data:
+            if self.verbose:
+                print('Processing data for {}'.format(fd['meta']['name']))
+            dlist = [] # initiate blank list every loop
+            # loop through channels and apply corresponding fatigue slope
+            for var in dic.keys():
+                # find rainflow ranges
+                ranges = fatpack.find_rainflow_ranges(fd[var])
+
+                # find range count and bin
+                Nrf, Srf = fatpack.find_range_count(ranges,binNum)
+
+                # get DEL
+                DELs = Srf**dic[var] * Nrf / t
+                DEL = DELs.sum() ** (1/dic[var])
+                dlist.append(DEL)
+            # append DEL values for each channel to master list
+            dflist.append(dlist)
+
+            # create dataframe to return
+            dfDEL = pd.DataFrame(np.transpose(dflist))
+            dfDEL = dfDEL.T
+            dfDEL.columns = dic.keys()
+
+        return dfDEL
 
 class Power_Production(object):
     '''
@@ -364,7 +420,8 @@ class Power_Production(object):
 
         # load power array
         if 'GenPwr' in stats_df.columns.levels[0]:
-            pwr_array = np.array(stats_df.loc[:, ('GenPwr', 'mean')])
+            pwr_array = stats_df.loc[:, ('GenPwr', 'mean')]
+            pwr_array = pwr_array.to_frame()
         elif 'GenPwr' in stats_df.columns.levels[1]:
             pwr_array = stats_df.loc[:, (slice(None), 'GenPwr', 'mean')]
         else:
