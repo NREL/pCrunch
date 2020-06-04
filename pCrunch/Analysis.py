@@ -302,10 +302,11 @@ class Loads_Analysis(object):
 
         # pre-allocate list
         dflist = []
+        names = []
 
         for fd in fast_data:
             if self.verbose:
-                print('Processing data for {}'.format(fd['meta']['name']))
+                print('Calculating DEL for {}'.format(fd['meta']['name']))
             dlist = [] # initiate blank list every loop
             # loop through channels and apply corresponding fatigue slope
             for var in dic.keys():
@@ -326,7 +327,11 @@ class Loads_Analysis(object):
             dfDEL = pd.DataFrame(np.transpose(dflist))
             dfDEL = dfDEL.T
             dfDEL.columns = dic.keys()
-
+            
+            #save simulation names
+            names.append(fd['meta']['name'])
+        dfDEL['Case_Name'] = names
+        
         return dfDEL
 
 class Power_Production(object):
