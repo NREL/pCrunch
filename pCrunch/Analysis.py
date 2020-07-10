@@ -175,7 +175,7 @@ class Loads_Analysis(object):
                     if 'DEL' not in sum_stats[channel].keys():
                         sum_stats[channel]['DEL'] = []
                     
-                    dfDEL = self.get_DEL([fd], [(channel, m)])
+                    dfDEL = self.get_DEL([fd], [(channel, m)], t=fd['Time'][-1])
                     sum_stats[channel]['DEL'].append(float(dfDEL[channel][0]))
 
 
