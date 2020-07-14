@@ -48,6 +48,7 @@ class Loads_Analysis(object):
                               'max',
                               ]  # should be same length as ranking_vars
 
+        self.DEL_info = None #[('RootMyb1', 10), ('RootMyb2', 10), ('RootMyb3', 10)]
         # verbose?
         self.verbose=False
 
@@ -163,8 +164,20 @@ class Loads_Analysis(object):
                     except ValueError:
                         print('Error loading data from {}.'.format(channel))
                     except:
-                        print('{} is not in available OpenFAST output data'.format(channel))
-            
+                        print('{} is not in available OpenFAST output data.'.format(channel))
+
+            # Add DELS to summary stats
+            if self.DEL_info:
+                for channel, m in self.DEL_info:
+                    if channel not in sum_stats.keys():
+                        print('Cannot get DELs for {} because it does not exist in output data.'.format(channel))
+                        break
+                    if 'DEL' not in sum_stats[channel].keys():
+                        sum_stats[channel]['DEL'] = []
+                    
+                    dfDEL = self.get_DEL([fd], [(channel, m)], t=fd['Time'][-1])
+                    sum_stats[channel]['DEL'].append(float(dfDEL[channel][0]))
+
 
         return sum_stats
 

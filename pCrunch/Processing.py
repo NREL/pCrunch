@@ -56,6 +56,8 @@ class FAST_Processing(object):
                                 'max',
                                     ] # should be same length as ranking_vars
         
+        self.DEL_info = None  # [('RootMyb1', 10), ('RootMyb2', 10), ('RootMyb3', 10)]
+
         # Save settings
         self.results_dir       = 'temp_results'
         self.save_LoadRanking  = False  # NJA - does not exist yet
@@ -187,6 +189,7 @@ class FAST_Processing(object):
             loads_analysis.verbose = self.verbose
             loads_analysis.t0 = self.t0
             loads_analysis.tf = self.tf
+            loads_analysis.DEL_info = self.DEL_info
 
             # run analysis in parallel
             if self.parallel_analysis:
@@ -216,7 +219,7 @@ class FAST_Processing(object):
                 loads_analysis.verbose = self.verbose
                 loads_analysis.t0 = self.t0
                 loads_analysis.tf = self.tf
-
+                loads_analysis.DEL_info = self.DEL_info
                 stats, load_rankings = loads_analysis.full_loads_analysis(self.OpenFAST_outfile_list, get_load_ranking=True)
 
         if self.save_SummaryStats:
@@ -278,7 +281,8 @@ class FAST_Processing(object):
         loads_analysis.tf = self.tf
         loads_analysis.ranking_vars = self.ranking_vars
         loads_analysis.ranking_stats = self.ranking_stats
-
+        loads_analysis.DEL_info = self.DEL_info
+        
         if self.parallel_analysis: # run analysis in parallel
             # run analysis
             pool = mp.Pool(self.parallel_cores)
