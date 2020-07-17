@@ -382,11 +382,11 @@ class Power_Production(object):
         p_bin: list
             list containing probabilities per wind speed bin 
         '''
-        if self.turbine_class == 1:
+        if self.turbine_class in [1, 'I']:
             Vavg = 50 * 0.2
-        elif self.turbine_class == 2:
+        elif self.turbine_class in [2, 'II']:
             Vavg = 42.5 * 0.2
-        elif self.turbine_class == 3:
+        elif self.turbine_class in [3, 'III']:
             Vavg = 37.5 * 0.2
 
         # Define parameters
