@@ -542,7 +542,7 @@ class wsPlotting(object):
             means = sdf.loc[:, (slice(None), 'mean')].droplevel(1, axis=1)
             std = sdf.loc[:, (slice(None), 'std')].droplevel(1, axis=1)
             # Plot bar charts
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(constrained_layout=True)
             means.plot.bar(yerr=std, ax=ax, title=plotvar, capsize=2)
             ax.legend(names,loc='upper left')
 
@@ -553,7 +553,7 @@ class wsPlotting(object):
             smin = sdf.loc[:, (sdf.columns.levels[0][stat_idx], 'min')]
             std = sdf.loc[:, (sdf.columns.levels[0][stat_idx], 'std')]
 
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(constrained_layout=True)
             ax.errorbar(pl_windspeeds, means, [means - smin, smax - means],
                          fmt='k', ecolor='gray', lw=1, capsize=2)
             means.plot(yerr=std, ax=ax, 
