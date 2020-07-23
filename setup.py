@@ -41,7 +41,8 @@ REQUIRED = [
     'pytest',
     'scipy',
     'pyYAML',
-    'seaborn'
+    'seaborn',
+    'fatpack'
 ]
 
 # Read the docs, one day, so we'll throw it in here!
