@@ -9,6 +9,7 @@ import pandas as pd
 import seaborn as sns
 import fatpack # 3rd party module used for rainflow counting
 
+from scipy.interpolate import PchipInterpolator
 from ROSCO_toolbox.utilities import FAST_IO
 
 from pCrunch import pdTools
@@ -32,6 +33,9 @@ class Loads_Analysis(object):
         self.tf = None
         # Desired channels for analysis
         self.channel_list = []
+        self.channels_magnitude = {}
+
+        self.channels_extreme_table = []
 
         # Load Ranking 
         self.ranking_vars = [["RotSpeed"],
@@ -115,6 +119,7 @@ class Loads_Analysis(object):
         channel_list: list
             list of channels to collect data from. Defaults to all
 
+
         Returns:
         -------
         data_out: dict
@@ -129,10 +134,10 @@ class Loads_Analysis(object):
 
             # Build channel list if it isn't input
             if channel_list == []:
-                channel_list = fd.keys()
+                channel_list = list(fd.keys())
 
             # Process Data
-            for channel in channel_list:
+            for channel in channel_list + list(self.channels_magnitude.keys()):
                 if channel == 'meta':
                     if 'meta' not in sum_stats.keys():
                         sum_stats['meta'] = {}
@@ -142,29 +147,51 @@ class Loads_Analysis(object):
                     sum_stats['meta']['name'] = fd['meta']['name']
                     sum_stats['meta']['filename'] = fd['meta']['filename']
 
-                elif channel != 'Time' and channel in channel_list:
-                    try:
-                        if channel not in sum_stats.keys():
-                            sum_stats[channel] = {}
-                            sum_stats[channel]['min'] = []
-                            sum_stats[channel]['max'] = []
-                            sum_stats[channel]['std'] = []
-                            sum_stats[channel]['mean'] = []
-                            sum_stats[channel]['abs'] = []
-                            sum_stats[channel]['integrated'] = []
-                        # calculate summary statistics
-                        sum_stats[channel]['min'].append(float(min(fd[channel])))
-                        sum_stats[channel]['max'].append(float(max(fd[channel])))
-                        sum_stats[channel]['std'].append(float(np.std(fd[channel])))
-                        sum_stats[channel]['mean'].append(float(np.mean(fd[channel])))
-                        sum_stats[channel]['abs'].append(float(max(np.abs(fd[channel]))))
-                        sum_stats[channel]['integrated'].append(
-                            float(np.trapz(fd['Time'], fd[channel])))
+                elif channel != 'Time' and channel in channel_list+list(self.channels_magnitude.keys()):
+                    # try:
 
-                    except ValueError:
-                        print('Error loading data from {}.'.format(channel))
-                    except:
-                        print('{} is not in available OpenFAST output data.'.format(channel))
+                    if channel in channel_list:
+                        y_data = fd[channel]
+                    elif channel in self.channels_magnitude.keys():
+                        # calculate magnitude of a vector
+                        vector = np.array([fd[var] for var in self.channels_magnitude[channel]])
+                        n_dim, n_t = np.shape(vector)
+                        y_data = np.array([np.sqrt(np.sum([vector[i,j]**2. for i in range(n_dim)])) for j in range(n_t)])
+
+                    if channel not in sum_stats.keys():
+                        sum_stats[channel] = {}
+                        sum_stats[channel]['min'] = []
+                        sum_stats[channel]['max'] = []
+                        sum_stats[channel]['std'] = []
+                        sum_stats[channel]['mean'] = []
+                        sum_stats[channel]['abs'] = []
+                        sum_stats[channel]['integrated'] = []
+                        sum_stats[channel]['extreme_table'] = []
+                    # calculate summary statistics
+                    sum_stats[channel]['min'].append(float(min(y_data)))
+                    sum_stats[channel]['max'].append(float(max(y_data)))
+                    sum_stats[channel]['std'].append(float(np.std(y_data)))
+                    sum_stats[channel]['mean'].append(float(np.mean(y_data)))
+                    sum_stats[channel]['abs'].append(float(max(np.abs(y_data))))
+                    sum_stats[channel]['integrated'].append(float(np.trapz(fd['Time'], y_data)))
+
+                    if len(self.channels_extreme_table) > 0:
+                        # outputting user specifed channels at the time where the maximum value occurs
+                        extreme_table = {}
+                        idx_max = np.argmax(y_data)
+                        for var in self.channels_extreme_table:
+                            extreme_table[var] = fd[var][idx_max]
+                        sum_stats[channel]['extreme_table'].append(extreme_table)
+
+                    # except ValueError:
+                    #     print('Error loading data from {}.'.format(channel))
+                    # except:
+                    #     print('{} is not in available OpenFAST output data.'.format(channel))
+
+            # if self.channels_magnitude:
+            #     for channel in self.channels_magnitude.keys():
+
+
 
             # Add DELS to summary stats
             if self.DEL_info:
@@ -404,7 +431,7 @@ class Power_Production(object):
         
         return wind_prob
 
-    def AEP(self, stats, windspeeds):
+    def AEP(self, stats, windspeeds, U_pwr_curve=[], pwr_curve_vars=[]):
         '''
         Get AEPs for simulation cases
 
@@ -418,6 +445,12 @@ class Power_Production(object):
         windspeeds: list-like
             List of wind speed values corresponding to each power output in the stats input 
             for a single dataset
+
+        n_pwr_curve: list-like
+            List of wind speed values to output power variables
+
+        pwr_curve_vars: list of strings
+            List of OpenFAST output channels to return the mean value as a function of wind speeds
 
         Returns:
         --------
@@ -464,7 +497,39 @@ class Power_Production(object):
         # Calculate AEP
         AEP = np.trapz(pwr_array.T *  wind_prob, ws_set) * 8760
 
-        return AEP
+        # return power curves
+        if len(pwr_curve_vars) > 0:
+            performance_curves = {}
+            if len(U_pwr_curve) > 0:
+                performance_curves['U'] = U_pwr_curve
+            else:
+                performance_curves['U'] = ws_set
+
+            for var in pwr_curve_vars:
+                # get data
+                if var in stats_df.columns.levels[0]:
+                    perf_array = stats_df.loc[:, (var, 'mean')]
+                    perf_array = perf_array.to_frame()
+                elif var in stats_df.columns.levels[1]:
+                    perf_array = stats_df.loc[:, (slice(None), var, 'mean')]
+                else:
+                    raise ValueError("(%s,'Mean') does not exist in the input statistics."%var)
+                # average by wind speed
+                perf_array['windspeeds'] = ws 
+                perf_array = perf_array.groupby('windspeeds').mean()
+
+                if len(U_pwr_curve) > 0:
+                    spline = PchipInterpolator(ws_set, perf_array)
+                    performance_curves[var] = spline(performance_curves['U']).flatten()
+                else:
+                    performance_curves[var] = perf_array
+
+        
+
+        if len(pwr_curve_vars) > 0:
+            return AEP, performance_curves
+        else:
+            return AEP
 
 class wsPlotting(object):
     '''
