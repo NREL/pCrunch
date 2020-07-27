@@ -166,7 +166,9 @@ class Loads_Analysis(object):
                         sum_stats[channel]['mean'] = []
                         sum_stats[channel]['abs'] = []
                         sum_stats[channel]['integrated'] = []
-                        sum_stats[channel]['extreme_table'] = []
+                        if len(self.channels_extreme_table) > 0:
+                            sum_stats[channel]['extreme_table'] = []
+                            sum_stats[channel]['extreme_table_t'] = []
                     # calculate summary statistics
                     sum_stats[channel]['min'].append(float(min(y_data)))
                     sum_stats[channel]['max'].append(float(max(y_data)))
@@ -181,7 +183,8 @@ class Loads_Analysis(object):
                         idx_max = np.argmax(y_data)
                         for var in self.channels_extreme_table:
                             extreme_table[var] = fd[var][idx_max]
-                        sum_stats[channel]['extreme_table'].append(extreme_table)
+                        sum_stats[channel]['extreme_table'].append(extreme_table[var])
+                        sum_stats[channel]['extreme_table_t'].append(fd['Time'][idx_max])
 
                     # except ValueError:
                     #     print('Error loading data from {}.'.format(channel))
@@ -607,7 +610,7 @@ class wsPlotting(object):
             means = sdf.loc[:, (slice(None), 'mean')].droplevel(1, axis=1)
             std = sdf.loc[:, (slice(None), 'std')].droplevel(1, axis=1)
             # Plot bar charts
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(constrained_layout=True)
             means.plot.bar(yerr=std, ax=ax, title=plotvar, capsize=2)
             ax.legend(names,loc='upper left')
 
@@ -618,7 +621,7 @@ class wsPlotting(object):
             smin = sdf.loc[:, (sdf.columns.levels[0][stat_idx], 'min')]
             std = sdf.loc[:, (sdf.columns.levels[0][stat_idx], 'std')]
 
-            fig, ax = plt.subplots()
+            fig, ax = plt.subplots(constrained_layout=True)
             ax.errorbar(pl_windspeeds, means, [means - smin, smax - means],
                          fmt='k', ecolor='gray', lw=1, capsize=2)
             means.plot(yerr=std, ax=ax, 
