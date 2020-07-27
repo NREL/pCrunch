@@ -166,7 +166,9 @@ class Loads_Analysis(object):
                         sum_stats[channel]['mean'] = []
                         sum_stats[channel]['abs'] = []
                         sum_stats[channel]['integrated'] = []
-                        sum_stats[channel]['extreme_table'] = []
+                        if len(self.channels_extreme_table) > 0:
+                            sum_stats[channel]['extreme_table'] = []
+                            sum_stats[channel]['extreme_table_t'] = []
                     # calculate summary statistics
                     sum_stats[channel]['min'].append(float(min(y_data)))
                     sum_stats[channel]['max'].append(float(max(y_data)))
@@ -181,7 +183,8 @@ class Loads_Analysis(object):
                         idx_max = np.argmax(y_data)
                         for var in self.channels_extreme_table:
                             extreme_table[var] = fd[var][idx_max]
-                        sum_stats[channel]['extreme_table'].append(extreme_table)
+                        sum_stats[channel]['extreme_table'].append(extreme_table[var])
+                        sum_stats[channel]['extreme_table_t'].append(fd['Time'][idx_max])
 
                     # except ValueError:
                     #     print('Error loading data from {}.'.format(channel))
