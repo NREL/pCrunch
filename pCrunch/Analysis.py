@@ -127,7 +127,9 @@ class Loads_Analysis(object):
         fast_outdata: dict, optional
             Dictionary of all OpenFAST output data. Only returned if return_data=true
         '''
-        sum_stats = {}
+        sum_stats     = {}
+        extreme_table = {}
+
         for fd in fast_data:
             if self.verbose:
                 print('Processing data for {}'.format(fd['meta']['name']))
@@ -166,9 +168,7 @@ class Loads_Analysis(object):
                         sum_stats[channel]['mean'] = []
                         sum_stats[channel]['abs'] = []
                         sum_stats[channel]['integrated'] = []
-                        if len(self.channels_extreme_table) > 0:
-                            sum_stats[channel]['extreme_table'] = []
-                            sum_stats[channel]['extreme_table_t'] = []
+
                     # calculate summary statistics
                     sum_stats[channel]['min'].append(float(min(y_data)))
                     sum_stats[channel]['max'].append(float(max(y_data)))
@@ -179,12 +179,17 @@ class Loads_Analysis(object):
 
                     if len(self.channels_extreme_table) > 0:
                         # outputting user specifed channels at the time where the maximum value occurs
-                        extreme_table = {}
+                        if channel not in extreme_table:
+                            extreme_table[channel] = []
+
+                        extreme_table_i = {}
                         idx_max = np.argmax(y_data)
                         for var in self.channels_extreme_table:
-                            extreme_table[var] = fd[var][idx_max]
-                        sum_stats[channel]['extreme_table'].append(extreme_table[var])
-                        sum_stats[channel]['extreme_table_t'].append(fd['Time'][idx_max])
+                            extreme_table_i[var] = {}
+                            extreme_table_i[var]['time'] = fd['Time'][idx_max]
+                            extreme_table_i[var]['val']  = fd[var][idx_max]
+                            
+                        extreme_table[channel].append(extreme_table_i)
 
                     # except ValueError:
                     #     print('Error loading data from {}.'.format(channel))
@@ -193,7 +198,6 @@ class Loads_Analysis(object):
 
             # if self.channels_magnitude:
             #     for channel in self.channels_magnitude.keys():
-
 
 
             # Add DELS to summary stats
@@ -209,7 +213,10 @@ class Loads_Analysis(object):
                     sum_stats[channel]['DEL'].append(float(dfDEL[channel][0]))
 
 
-        return sum_stats
+        if len(self.channels_extreme_table) > 0:
+            return sum_stats, extreme_table
+        else:
+            return sum_stats
 
 
     def load_ranking(self, stats, names=[], get_df=False):
