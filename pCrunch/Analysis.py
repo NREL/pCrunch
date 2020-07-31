@@ -355,11 +355,11 @@ class Loads_Analysis(object):
         names = []
 
         for fd in fast_data:
-            if self.verbose:
-                print('Calculating DEL for {}'.format(fd['meta']['name']))
             dlist = [] # initiate blank list every loop
             # loop through channels and apply corresponding fatigue slope
             for var in dic.keys():
+                if self.verbose:
+                    print('Calculating DEL for {} in {}'.format(var, fd['meta']['name']))
                 # find rainflow ranges
                 ranges = fatpack.find_rainflow_ranges(fd[var])
 
