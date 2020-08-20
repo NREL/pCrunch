@@ -31,7 +31,7 @@ URL = 'https://github.com/NREL/pCrunch'
 EMAIL = 'nikhar.abbas@nrel.gov'
 AUTHOR = 'Nikhar Abbas'
 REQUIRES_PYTHON = '>=3.4'
-VERSION = '0.1.0'
+VERSION = '0.1.1'
 
 # These packages are required for all of the code to be executed. 
 # - Maybe you can get away with older versions...
