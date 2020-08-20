@@ -355,11 +355,11 @@ class Loads_Analysis(object):
         names = []
 
         for fd in fast_data:
-            if self.verbose:
-                print('Calculating DEL for {}'.format(fd['meta']['name']))
             dlist = [] # initiate blank list every loop
             # loop through channels and apply corresponding fatigue slope
             for var in dic.keys():
+                if self.verbose:
+                    print('Calculating DEL for {} in {}'.format(var, fd['meta']['name']))
                 # find rainflow ranges
                 ranges = fatpack.find_rainflow_ranges(fd[var])
 
@@ -529,10 +529,10 @@ class Power_Production(object):
                 perf_array = perf_array.groupby('windspeeds').mean()
 
                 if len(U_pwr_curve) > 0:
-                    spline = PchipInterpolator(ws_set, perf_array)
+                    spline = PchipInterpolator(ws_set, perf_array[var])
                     performance_curves[var] = spline(performance_curves['U']).flatten()
                 else:
-                    performance_curves[var] = perf_array
+                    performance_curves[var] = perf_array[var]
 
         
 
