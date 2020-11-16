@@ -4,10 +4,11 @@ __maintainer__ = "Jake Nunemaker"
 __email__ = ["jake.nunemaker@nrel.gov"]
 
 
+import numpy as np
 from .openfast import OpenFASTAscii, OpenFASTBinary, OpenFASTOutput
 
 
-def load_FAST_out(filenames, tmin=0, tmax=None, **kwargs):
+def load_FAST_out(filenames, tmin=0, tmax=np.inf, **kwargs):
     """
     Load a list of OpenFAST files.
 
@@ -39,9 +40,8 @@ def load_FAST_out(filenames, tmin=0, tmax=None, **kwargs):
             output = OpenFASTAscii(fn, **kwargs)
             output.read()
 
+        output.trim_data(tmin, tmax)
         fastout.append(output)
-
-    # TODO: Add trim_output
 
     return fastout
 
