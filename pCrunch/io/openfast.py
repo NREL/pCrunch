@@ -60,6 +60,24 @@ class OpenFASTOutput:
             self, "_desc", f"Unread OpenFAST output at '{self.filepath}'"
         )
 
+    def trim_data(self, tmin=0, tmax=np.inf):
+        """
+        Trims `self.data` to the data between `tmin` and `tmax`.
+
+        Parameters
+        ----------
+        tmin : int | float
+            Start time.
+        tmax : int | float
+            Ending time.
+        """
+
+        idx = np.where((self.time >= tmin) & (self.time <= tmax))
+        if tmin > max(self.time):
+            raise ValueError(f"Initial time '{tmin}' is after the end of the simulation.")
+
+        self.data = self.data[idx]
+
     @dataproperty
     def data(self):
         """Returns output data at `self._data`."""
