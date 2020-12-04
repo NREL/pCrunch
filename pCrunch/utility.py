@@ -4,6 +4,174 @@ __maintainer__ = ["Nikhar Abbas", "Jake Nunemaker"]
 __email__ = ["nikhar.abbas@nrel.gov", "jake.nunemaker@nrel.gov"]
 
 
+import os
+
+import yaml
+import pandas as pd
+from yaml import Dumper, Loader
+
+
+def df2dict(df):
+    """
+    Build dictionary from pandas dataframe
+    Parameters:
+    -----------
+    df: DataFrame
+        DataFrame with summary stats (probably). Cannot have len(multiindex) > 3
+    Returns:
+    --------
+    dfd: dict
+        dictionary containing re-structured dataframe inputs
+    """
+
+    if len(df.columns[0]) == 3:
+        dfd = [
+            {
+                level: df.xs(dset, axis=1).xs(level, axis=1).to_dict("list")
+                for level in df.columns.levels[1]
+            }
+            for dset in df.columns.levels[0]
+        ]
+
+    elif len(df.columns[0]) == 2:
+        dfd = {
+            level: df.xs(level, axis=1).to_dict("list")
+            for level in df.columns.levels[0]
+        }
+
+    elif len(df.columns[0]) == 1:
+        dfd = df.to_dict("list")
+
+    else:
+        raise TypeError(
+            "Converting DataFrames with multiindex > 3 to dictionaries is not supported"
+        )
+
+    try:
+        _ = dfd["meta"]["filename"]
+
+    except IndexError:
+        dfd["meta"] = {"filename": list(df.index)}
+
+    return dfd
+
+
+def save_yaml(outdir, fname, data):
+    """
+    Save data as '.yaml' file.
+
+    Parameters:
+    -----------
+    outdir : str
+        Directory to save data.
+    fname : str
+        Filename for output yaml.
+    data : dict
+        Data to save to yaml.
+    """
+
+    filepath = os.path.join(outdir, fname)
+    if not os.path.isdir(outdir):
+        os.makedirs(outdir)
+
+    with open(filepath, "w") as f:
+        yaml.dump(data, f, Dumper=Dumper, default_flow_style=False)
+
+
+def load_yaml(filepath):
+    """
+    Import a .yaml file.
+
+    Parameters:
+    -----------
+    filepath : str
+        File to load.
+    """
+
+    with open(filepath) as f:
+        data = yaml.load(f, Loader=Loader)
+
+    return data
+
+
+def dict2df(sumstats, names=None):
+    """
+    Build pandas datafrom from list of summary statistics.
+
+    Inputs:
+    -------
+    sumstats: list
+        List of the dictionaries loaded from post_process.load_yaml
+    names: list, optional
+        List of names for each run. len(sumstats)=len(names)
+
+    Returns:
+    --------
+    df: pd.DataFrame
+        pandas dataframe
+    """
+
+    if isinstance(sumstats, list):
+        if not names:
+            names = ["dataset_" + str(i) for i in range(len(sumstats))]
+        data_dict = {
+            (name, outerKey, innerKey): values
+            for name, sumdata in zip(names, sumstats)
+            for outerKey, innerDict in sumdata.items()
+            for innerKey, values in innerDict.items()
+        }
+
+    else:
+        data_dict = {
+            (outerKey, innerKey): values
+            for outerKey, innerDict in sumstats.items()
+            for innerKey, values in innerDict.items()
+        }
+
+    # Make dataframe
+    df = pd.DataFrame(data_dict)
+
+    return df
+
+
+def yaml2df(filename, names=[]):
+    """
+    Read yaml containing summary stats into dataframe
+    Parameters:
+    -------
+    filename:
+        Name of yaml file to load.
+    """
+
+    data_dict = load_yaml("test.yaml", package=0)
+
+    level = data_dict
+    li = 0  # level index
+    while isinstance(level, dict):
+        li = li + 1
+        if isinstance(level, dict):
+            level = level[list(level.keys())[0]]
+
+    data_list = []
+    if li == 3:
+        for key in data_dict.keys():
+            data_list.append(data_dict[key])
+        if not names:
+            names = ["dataset_" + str(i) for i in range(len(data_list))]
+
+    elif li == 2:
+        data_list.append(data_dict)
+        names = []
+    else:
+        raise TypeError(
+            "{} is improperly structured for yaml2df.".format(filename)
+        )
+
+    df = dict2df(data_list, names=names)
+
+    return df
+
+
 # class wsPlotting(object):
 #     '''
 #     General plotting scripts.
@@ -282,53 +450,3 @@ __email__ = ["nikhar.abbas@nrel.gov", "jake.nunemaker@nrel.gov"]
 #     #         #         ax.set_xticklabels(np.arange(n_rankings), labels=labels)
 
 #     return fig_list, ax_list
-
-
-# def save_yaml(outdir, fname, data_out):
-
-#     ''' Save yaml file - ripped from WISDEM
-
-#     Parameters:
-#     -----------
-#     outdir: str
-#         directory to save yaml
-#     fname: str
-#         filename for yaml
-#     data_out: dict
-#         data to dump to yaml
-#     '''
-#     fname = os.path.join(outdir, fname)
-
-#     if not os.path.isdir(outdir):
-#         os.makedirs(outdir)
-
-#     f = open(fname, "w")
-#     yaml = ry.YAML()
-#     yaml.default_flow_style = None
-#     yaml.width = float("inf")
-#     yaml.indent(mapping=4, sequence=6, offset=3)
-#     yaml.dump(data_out, f)
-
-
-# def load_yaml(fname_input, package=0):
-#     ''' Import a .yaml file - ripped from WISDEM
-
-#     Parameters:
-#     -----------
-#     fname_input: str
-#         yaml file to load
-#     package: bool
-#         0 = yaml, 1 = ruamel
-#     '''
-
-#     if package == 0:
-#         with open(fname_input) as f:
-#             data = yaml.safe_load(f)
-#         return data
-
-#     elif package == 1:
-#         with open(fname_input, 'r') as myfile:
-#             text_input = myfile.read()
-#         myfile.close()
-#         ryaml = ry.YAML()
-#         return dict(ryaml.load(text_input))
