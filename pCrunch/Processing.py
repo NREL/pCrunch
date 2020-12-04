@@ -301,13 +301,14 @@ class FAST_Processing(object):
             stats = pdTools.df2dict(dft)
 
             # Get load rankings after stats are loaded
-            load_rankings = loads_analysis.load_ranking(stats) 
+            load_rankings = loads_analysis.load_ranking(stats, names=self.dataset_names) 
 
         else: # run analysis in serial
             stats = []
             load_rankings = []
             for file_sets in filenames:
-                st, lr = loads_analysis.full_loads_analysis(file_sets, get_load_ranking=True)
+                st, lr = loads_analysis.full_loads_analysis(file_sets, get_load_ranking=True, 
+                                            names=self.dataset_names)
                 stats.append(st)
                 load_rankings.append(lr)
             
