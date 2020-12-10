@@ -171,18 +171,13 @@ class LoadsAnalysis:
         """
 
         fp = os.path.join(self.directory, f)
-        if f.endswith(
-            "outb"
-        ):  # TODO: Convert to try/except with UnicodeError?
-            output = OpenFASTBinary(fp, calculated_channels=self._cc)
+        try:
+            output = OpenFASTAscii(fp)
             output.read()
 
-        elif f.endswith("out"):
-            output = OpenFASTAscii(fp, calculated_channels=self._cc)
+        except UnicodeDecodeError:
+            output = OpenFASTBinary(fp)
             output.read()
-
-        else:
-            raise NotImplementedError("Other file formats not supported yet.")
 
         return output
 
