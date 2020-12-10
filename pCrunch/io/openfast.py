@@ -21,22 +21,8 @@ def dataproperty(f):
     return wrapper
 
 
-class OpenFASTOutput:
+class OpenFASTBase:
     """Base OpenFAST output class."""
-
-    def __init__(self, data, dlc, **kwargs):
-        """
-        Creates an instance of `OpenFASTOutput`.
-
-        Parameters
-        ----------
-        data : np.ndarray
-        """
-
-        self.data = data
-        self._dlc = dlc
-        self._calc_chan = kwargs.get("calculated_channels", [])
-        self.calculated_channels()
 
     def __getitem__(self, chan):
         try:
@@ -74,7 +60,9 @@ class OpenFASTOutput:
 
         idx = np.where((self.time >= tmin) & (self.time <= tmax))
         if tmin > max(self.time):
-            raise ValueError(f"Initial time '{tmin}' is after the end of the simulation.")
+            raise ValueError(
+                f"Initial time '{tmin}' is after the end of the simulation."
+            )
 
         self.data = self.data[idx]
 
@@ -253,7 +241,38 @@ class OpenFASTOutput:
         return kurtosis.flatten()
 
 
-class OpenFASTBinary(OpenFASTOutput):
+class OpenFASTOutput(OpenFASTBase):
+    def __init__(self, data, channels, dlc, **kwargs):
+        """
+        Creates an instance of `OpenFASTOutput`.
+
+        Parameters
+        ----------
+        data : np.ndarray
+        """
+
+        self._data = data
+
+        if isinstance(channels, list):
+            self.channels = np.array(channels)
+
+        else:
+            self.channels = channels
+
+        self._dlc = dlc
+        self._calc_chan = kwargs.get("calculated_channels", [])
+        self.calculated_channels()
+
+    @classmethod
+    def from_dict(cls, data, name, **kwargs):
+
+        channels = list(data.keys())
+        data = np.array(list(data.values())).T
+
+        return cls(data, channels, name, **kwargs)
+
+
+class OpenFASTBinary(OpenFASTBase):
     """OpenFAST binary output class."""
 
     def __init__(self, filepath, **kwargs):
@@ -357,7 +376,7 @@ class OpenFASTBinary(OpenFASTOutput):
             self.time = t1 + incr * np.arange(length)
 
 
-class OpenFASTAscii(OpenFASTOutput):
+class OpenFASTAscii(OpenFASTBase):
     """
     OpenFAST ASCII output class.
 
