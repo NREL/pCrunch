@@ -5,6 +5,7 @@ __email__ = ["jake.nunemaker@nrel.gov"]
 
 
 import numpy as np
+
 from .openfast import OpenFASTAscii, OpenFASTBinary, OpenFASTOutput
 
 
@@ -33,15 +34,14 @@ def load_FAST_out(filenames, tmin=0, tmax=np.inf, **kwargs):
     for fn in filenames:
 
         try:
-            output = OpenFASTBinary(fn, **kwargs)
+            output = OpenFASTAscii(fn, **kwargs)
             output.read()
 
-        except IndexError:
-            output = OpenFASTAscii(fn, **kwargs)
+        except UnicodeDecodeError:
+            output = OpenFASTBinary(fn, **kwargs)
             output.read()
 
         output.trim_data(tmin, tmax)
         fastout.append(output)
 
     return fastout
-
