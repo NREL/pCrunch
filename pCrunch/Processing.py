@@ -15,7 +15,6 @@ except:
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ROSCO_toolbox.utilities import FAST_IO
 
 from pCrunch import Analysis, pdTools
 
@@ -349,7 +348,7 @@ def get_windspeeds(case_matrix, return_df=False):
     seed = []
     IECtype = []
     # loop through and parse each inflow filename text entry to get wind and seed #
-    for fname in  cmatrix[('InflowWind','Filename')]:
+    for fname in  cmatrix[('InflowWind','FileName_BTS')]:
         if '.bts' in fname:
             obj = fname.split('U')[-1].split('_')
             obj2 = obj[1].split('Seed')[-1].split('.bts')
