@@ -75,17 +75,17 @@ class OpenFASTBase:
     def data(self, data):
         self._data = data
 
-    def append_channel_magnitudes(self, channels):
+    def append_magnitude_channels(self):
         """
         Append the vector magnitude of `channels` to the dataset.
 
         Parameters
         ----------
-        channels : dict
+        self._magnitude_channels : dict
             Format: 'new-chan' ['chan1', 'chan2', 'chan3'],
         """
 
-        for new_chan, chans in channels.items():
+        for new_chan, chans in self._magnitude_channels.items():
 
             if new_chan in self.channels:
                 print(f"Channel '{new_chan}' already exists.")
@@ -240,6 +240,8 @@ class OpenFASTOutput(OpenFASTBase):
             self.channels = channels
 
         self._dlc = dlc
+        self._magnitude_channels = kwargs.get("magnitude_channels", {})
+        self.append_magnitude_channels()
 
     @classmethod
     def from_dict(cls, data, name, **kwargs):
@@ -265,6 +267,7 @@ class OpenFASTBinary(OpenFASTBase):
         self.filepath = filepath
         self._chan_chars = kwargs.get("chan_char_length", 10)
         self._unit_chars = kwargs.get("unit_char_length", 10)
+        self._magnitude_channels = kwargs.get("magnitude_channels", {})
 
     @property
     def filename(self):
@@ -300,6 +303,8 @@ class OpenFASTBinary(OpenFASTBase):
                 ],
                 1,
             )
+
+        self.append_magnitude_channels()
 
     def build_headers(self, f, num_channels):
         """
@@ -369,6 +374,7 @@ class OpenFASTAscii(OpenFASTBase):
         """
 
         self.filepath = filepath
+        self._magnitude_channels = kwargs.get("magnitude_channels", {})
 
     @property
     def filename(self):
@@ -387,6 +393,8 @@ class OpenFASTAscii(OpenFASTBase):
             self.data = np.fromfile(f, float, sep="\t").reshape(
                 -1, len(self.channels)
             )
+
+        self.append_magnitude_channels()
 
     def parse_header(self, f):
         """Reads the header data for file."""
