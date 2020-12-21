@@ -13,67 +13,45 @@ import numpy as np
 import pandas as pd
 import fatpack
 
-from pCrunch.io import OpenFASTAscii, OpenFASTBinary
+from pCrunch.io import OpenFASTAscii, OpenFASTBinary, OpenFASTOutput
 
 
 class LoadsAnalysis:
     """Implementation of `mlife` in python."""
 
-    def __init__(self, directory, **kwargs):
+    def __init__(self, outputs, **kwargs):
         """
         Creates an instance of `pyLife`.
 
         Parameters
         ----------
-        directory : path-like
-            Path to OpenFAST output files.
-        extensions : list
-            List of extensions to include from `directory`.
-            Not used if `files` is passed.
-            Default: ["*.out", "*.outb"]
-        operating_files : list (optional)
-            Operating files to read.
-            Default: []
-        idling_files : list (optional)
-            Idling files to read.
-            Default: []
-        discrete_files : list (optional)
-            Discrete files to read.
-            Default: []
-        aggregate_statistics : bool (optional)
-            Flag for calculating aggregate statistics.
-            Default: True
-        calculated_channels : list (optional)
-            Flags for additional calculated channels.
-            Default: []
+        outputs : list
+            List of OpenFAST output filepaths or dicts of OpenFAST outputs.
+        directory : str (optional)
+            If directory is passed, list of files will be treated as relative
+            and appended to the directory.
         fatigue_channels : dict (optional)
             Dictionary with format:
             'channel': 'fatigue slope'
+        magnitude_channels : dict (optional)
+            Additional channels as vector magnitude of other channels.
+            Format: 'new-chan': ['chan1', 'chan2', 'chan3']
         """
 
-        self.directory = directory
+        self.outputs = outputs
         self.parse_settings(**kwargs)
-
-    @staticmethod
-    def valid_extension(fp, extensions):
-        return any([fnmatch(fp, ext) for ext in extensions])
 
     def parse_settings(self, **kwargs):
         """Parses settings from input kwargs."""
 
-        self._files = {
-            "operating": kwargs.get("operating_files", []),
-            "idle": kwargs.get("idling_files", []),
-            "discrete": kwargs.get("discrete_files", []),
-        }
-
-        self._cc = kwargs.get("calculated_channels", [])
+        self._directory = kwargs.get("directory", None)
+        self._mc = kwargs.get("magnitude_channels", {})
         self._fc = kwargs.get("fatigue_channels", {})
 
-    def process_files(self, cores=1, **kwargs):
+    def process_outputs(self, cores=1, **kwargs):
         """
-        Processes all files for summary statistics, aggregate statistics and
-        configured damage equivalent loads.
+        Processes all outputs for summary statistics and configured damage
+        equivalent loads.
         """
 
         if cores > 1:
@@ -90,8 +68,8 @@ class LoadsAnalysis:
         summary_stats = {}
         DELs = {}
 
-        for i, f in enumerate(self.files):
-            filename, stats, dels = self._process_file(f, **kwargs)
+        for output in self.outputs:
+            filename, stats, dels = self._process_output(output, **kwargs)
             summary_stats[filename] = stats
             DELs[filename] = dels
 
@@ -104,7 +82,9 @@ class LoadsAnalysis:
         DELs = {}
 
         pool = mp.Pool(cores)
-        returned = pool.map(partial(self._process_file, **kwargs), self.files)
+        returned = pool.map(
+            partial(self._process_output, **kwargs), self.outputs
+        )
         pool.close()
         pool.join()
 
@@ -114,10 +94,31 @@ class LoadsAnalysis:
 
         return summary_stats, DELs
 
-    def _process_file(self, file, **kwargs):
-        """"""
+    def _process_output(self, f, **kwargs):
+        """
+        Process OpenFAST output `f`.
 
-        output = self.read_file(file)
+        Parameters
+        ----------
+        f : str | tuple
+            Path to output or direct output in dict format.
+        """
+
+        if isinstance(f, str):
+            if self._directory:
+                fp = os.path.join(self._directory, f)
+
+            else:
+                fp = f
+
+            output = self.read_file(fp)
+
+        else:
+            data, channels, dlc = f
+            output = OpenFASTOutput(
+                data, channels, dlc, magnitude_channels=self._mc
+            )
+
         stats = self.get_summary_stats(output, **kwargs)
         dels = self.get_DELs(output, **kwargs)
         return output.filename, stats, dels
@@ -170,20 +171,25 @@ class LoadsAnalysis:
             Filename that is appended to `self.directory`
         """
 
-        fp = os.path.join(self.directory, f)
+        if self._directory:
+            fp = os.path.join(self._directory, f)
+
+        else:
+            fp = f
+
         try:
-            output = OpenFASTAscii(fp)
+            output = OpenFASTAscii(fp, magnitude_channels=self._mc)
             output.read()
 
         except UnicodeDecodeError:
-            output = OpenFASTBinary(fp)
+            output = OpenFASTBinary(fp, magnitude_channels=self._mc)
             output.read()
 
         return output
 
     def get_load_rankings(self, ranking_vars, ranking_stats, **kwargs):
         """
-        Returns load rankings across all files in `self.files`.
+        Returns load rankings across all outputs in `self.outputs`.
 
         Parameters
         ----------
@@ -202,7 +208,7 @@ class LoadsAnalysis:
             if not isinstance(var, list):
                 var = [var]
 
-            col = pd.MultiIndex.from_product([self.files, var])
+            col = pd.MultiIndex.from_product([self.outputs, var])
             if stat in ["max", "abs"]:
                 res = (
                     *summary_stats.loc[col][stat].idxmax(),
@@ -235,31 +241,11 @@ class LoadsAnalysis:
         return pd.DataFrame(out, columns=["file", "channel", "stat", "val"])
 
     @property
-    def operating_files(self):
-        return self._files["operating"]
-
-    @property
-    def idle_files(self):
-        return self._files["idle"]
-
-    @property
-    def discrete_files(self):
-        return self._files["discrete"]
-
-    @property
-    def files(self):
-        return [*self.operating_files, *self.idle_files, *self.discrete_files]
-
-    @property
-    def filepaths(self):
-        return [os.path.join(self.directory, fn) for fn in self._files]
-
-    @property
     def summary_stats(self):
-        """Returns summary statistics for all files in `self.files`."""
+        """Returns summary statistics for all outputs in `self.outputs`."""
 
         if getattr(self, "_summary_stats", None) is None:
-            raise ValueError("Files have not been processed.")
+            raise ValueError("Outputs have not been processed.")
 
         return self._summary_stats
 
@@ -268,7 +254,7 @@ class LoadsAnalysis:
         """Returns damage equivalent loads for all channels in `self._fc`"""
 
         if getattr(self, "_dels", None) is None:
-            raise ValueError("Files have not been processed.")
+            raise ValueError("Outputs have not been processed.")
 
         return self._dels
 
@@ -292,7 +278,7 @@ class LoadsAnalysis:
 
             except IndexError as e:
                 print(f"Channel '{chan}' not found for DEL calculation.")
-                DELS[chan] = np.NaN
+                DELs[chan] = np.NaN
 
         return DELs
 
