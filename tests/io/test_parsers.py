@@ -16,24 +16,22 @@ DATA = os.path.join(DIR, "data")
 
 
 @pytest.mark.parametrize("fn", fnmatch.filter(os.listdir(DATA), "*.out"))
-def test_OpenFASTAscii(fn, magnitude_channels):
+def test_OpenFASTAscii(fn):
 
     filepath = os.path.join(DATA, fn)
-    output = OpenFASTAscii(filepath, magnitude_channels=magnitude_channels)
+    output = OpenFASTAscii(filepath)
     output.read()
 
     assert output.data.shape
     assert output.channels.shape
-    assert "Wind" in output.channels
 
 
 @pytest.mark.parametrize("fn", fnmatch.filter(os.listdir(DATA), "*.outb"))
-def test_OpenFASTBinary(fn, magnitude_channels):
+def test_OpenFASTBinary(fn):
 
     filepath = os.path.join(DATA, fn)
-    output = OpenFASTBinary(filepath, magnitude_channels=magnitude_channels)
+    output = OpenFASTBinary(filepath)
     output.read()
 
     assert output.data.shape
     assert output.channels.shape
-    assert "Wind" in output.channels
