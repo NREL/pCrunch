@@ -304,12 +304,22 @@ class OpenFASTBinary(OpenFASTBase):
         with open(self.filepath, "rb") as f:
             self.fmt = np.fromfile(f, np.int16, 1)[0]
 
+            if self.fmt == 4:
+                self._chan_chars = np.fromfile(f, np.int16, 1)[0]
+                self._unit_chars = self._chan_chars
+
             num_channels = np.fromfile(f, np.int32, 1)[0]
             num_timesteps = np.fromfile(f, np.int32, 1)[0]
             num_points = num_channels * num_timesteps
             time_info = np.fromfile(f, np.float64, 2)
-            self.slopes = np.fromfile(f, np.float32, num_channels)
-            self.offset = np.fromfile(f, np.float32, num_channels)
+
+            if self.fmt == 3:
+                self.slopes = np.ones(num_channels)
+                self.offset = np.zeros(num_channels)
+
+            else:
+                self.slopes = np.fromfile(f, np.float32, num_channels)
+                self.offset = np.fromfile(f, np.float32, num_channels)
 
             length = np.fromfile(f, np.int32, 1)[0]
             chars = np.fromfile(f, np.uint8, length)
@@ -318,16 +328,25 @@ class OpenFASTBinary(OpenFASTBase):
             self.build_headers(f, num_channels)
             time = self.build_time(f, time_info, num_timesteps)
 
-            raw = np.fromfile(f, np.int16, count=num_points).reshape(
-                num_timesteps, num_channels
-            )
-            self.data = np.concatenate(
-                [
-                    time.reshape(num_timesteps, 1),
-                    (raw - self.offset) / self.slopes,
-                ],
-                1,
-            )
+            if self.fmt == 3:
+                raw = np.fromfile(f, np.float64, count=num_points).reshape(
+                    num_timesteps, num_channels
+                )
+                self.data = np.concatenate(
+                    [time.reshape(num_timesteps, 1), raw], 1
+                )
+
+            else:
+                raw = np.fromfile(f, np.int16, count=num_points).reshape(
+                    num_timesteps, num_channels
+                )
+                self.data = np.concatenate(
+                    [
+                        time.reshape(num_timesteps, 1),
+                        (raw - self.offset) / self.slopes,
+                    ],
+                    1,
+                )
 
         self.append_magnitude_channels()
 
