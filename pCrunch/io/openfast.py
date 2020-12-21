@@ -117,6 +117,19 @@ class OpenFASTBase:
                 for k in range(self.num_channels)
             ]
 
+    def extremes(self, channels):
+        """"""
+
+        exists = [c for c in channels if c in self.channels]
+        idx = np.in1d(self.channels, exists).nonzero()[0]
+
+        extremes = {}
+        for chan, i, m in zip(exists, self.idxmaxs[idx], self.maxima[idx]):
+
+            extremes[chan] = {"time": self.time[i], "val": m}
+
+        return extremes
+
     @dataproperty
     def df(self):
         """Returns `self.data` as a DataFrame."""

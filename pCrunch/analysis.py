@@ -45,6 +45,7 @@ class LoadsAnalysis:
         """Parses settings from input kwargs."""
 
         self._directory = kwargs.get("directory", None)
+        self._ec = kwargs.get("extreme_channels", [])
         self._mc = kwargs.get("magnitude_channels", {})
         self._fc = kwargs.get("fatigue_channels", {})
 
@@ -55,30 +56,35 @@ class LoadsAnalysis:
         """
 
         if cores > 1:
-            stats, dels = self._process_parallel(cores, **kwargs)
+            stats, extremes, dels = self._process_parallel(cores, **kwargs)
 
         else:
-            stats, dels = self._process_serial(**kwargs)
+            stats, extremes, dels = self._process_serial(**kwargs)
 
-        self.post_process(stats, dels, **kwargs)
+        self.post_process(stats, extremes, dels, **kwargs)
 
     def _process_serial(self, **kwargs):
         """"""
 
         summary_stats = {}
+        extremes = {}
         DELs = {}
 
         for output in self.outputs:
-            filename, stats, dels = self._process_output(output, **kwargs)
+            filename, stats, extrs, dels = self._process_output(
+                output, **kwargs
+            )
             summary_stats[filename] = stats
+            extremes[filename] = extrs
             DELs[filename] = dels
 
-        return summary_stats, DELs
+        return summary_stats, extremes, DELs
 
     def _process_parallel(self, cores, **kwargs):
         """"""
 
         summary_stats = {}
+        extremes = {}
         DELs = {}
 
         pool = mp.Pool(cores)
@@ -88,11 +94,12 @@ class LoadsAnalysis:
         pool.close()
         pool.join()
 
-        for filename, stats, dels in returned:
+        for filename, stats, extrs, dels in returned:
             summary_stats[filename] = stats
+            extremes[filename] = extrs
             DELs[filename] = dels
 
-        return summary_stats, DELs
+        return summary_stats, extremes, DELs
 
     def _process_output(self, f, **kwargs):
         """
@@ -120,8 +127,10 @@ class LoadsAnalysis:
             )
 
         stats = self.get_summary_stats(output, **kwargs)
+        extremes = output.extremes(self._ec)
         dels = self.get_DELs(output, **kwargs)
-        return output.filename, stats, dels
+
+        return output.filename, stats, extremes, dels
 
     def get_summary_stats(self, output, **kwargs):
         """
@@ -148,13 +157,21 @@ class LoadsAnalysis:
 
         return fstats
 
-    def post_process(self, stats, dels, **kwargs):
+    def get_extreme_events(self, output, channels, **kwargs):
+        """"""
+
+        return output.extremes(channels)
+
+    def post_process(self, stats, extremes, dels, **kwargs):
         """Post processes internal data to produce DataFrame outputs."""
 
         # Summary statistics
         ss = pd.DataFrame.from_dict(stats, orient="index").stack().to_frame()
         ss = pd.DataFrame(ss[0].values.tolist(), index=ss.index)
         self._summary_stats = ss.unstack().swaplevel(axis=1)
+
+        # Extreme events
+        self._extremes = extremes
 
         # Damage equivalent loads
         dels = pd.DataFrame(dels).T
@@ -248,6 +265,15 @@ class LoadsAnalysis:
             raise ValueError("Outputs have not been processed.")
 
         return self._summary_stats
+
+    @property
+    def extreme_events(self):
+        """Returns extreme events for all files and channels in `self._ec`."""
+
+        if getattr(self, "_extremes", None) is None:
+            raise ValueError("Outputs have not been processed.")
+
+        return self._extremes
 
     @property
     def DELs(self):
