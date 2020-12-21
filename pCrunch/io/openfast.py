@@ -37,10 +37,6 @@ class OpenFASTBase:
         return self.description
 
     @property
-    def filename(self):
-        return self._dlc
-
-    @property
     def description(self):
         return getattr(
             self, "_desc", f"Unread OpenFAST output at '{self.filepath}'"
@@ -74,6 +70,18 @@ class OpenFASTBase:
     @data.setter
     def data(self, data):
         self._data = data
+
+    @dataproperty
+    def time(self):
+        return self["Time"]
+
+    @time.setter
+    def time(self, time):
+        if "Time" in self.channels:
+            raise ValueError(f"'Time' channel already exists in output data.")
+
+        self.data = np.append(time, self.data, axis=1)
+        self.channels = np.append("Time", self.channels)
 
     def append_magnitude_channels(self):
         """
@@ -243,6 +251,10 @@ class OpenFASTOutput(OpenFASTBase):
         self._magnitude_channels = kwargs.get("magnitude_channels", {})
         self.append_magnitude_channels()
 
+    @property
+    def filename(self):
+        return self._dlc
+
     @classmethod
     def from_dict(cls, data, name, **kwargs):
 
@@ -291,14 +303,14 @@ class OpenFASTBinary(OpenFASTBase):
             self._desc = "".join(map(chr, chars)).strip()
 
             self.build_headers(f, num_channels)
-            self.build_time(f, time_info, num_timesteps)
+            time = self.build_time(f, time_info, num_timesteps)
 
             raw = np.fromfile(f, np.int16, count=num_points).reshape(
                 num_timesteps, num_channels
             )
             self.data = np.concatenate(
                 [
-                    self.time.reshape(num_timesteps, 1),
+                    time.reshape(num_timesteps, 1),
                     (raw - self.offset) / self.slopes,
                 ],
                 1,
@@ -349,11 +361,13 @@ class OpenFASTBinary(OpenFASTBase):
         if self.fmt == 1:
             scale, offset = info
             data = np.fromfile(f, np.int32, length)
-            self.time = (data - offset) / scale
+            time = (data - offset) / scale
 
         else:
             t1, incr = info
-            self.time = t1 + incr * np.arange(length)
+            time = t1 + incr * np.arange(length)
+
+        return time
 
 
 class OpenFASTAscii(OpenFASTBase):
