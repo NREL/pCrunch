@@ -120,12 +120,11 @@ class OpenFASTBase:
     def extremes(self, channels):
         """"""
 
+        sorter = np.argsort(self.channels)
         exists = [c for c in channels if c in self.channels]
-        idx = np.in1d(self.channels, exists).nonzero()[0]
-
+        idx = sorter[np.searchsorted(self.channels, exists, sorter=sorter)]
         extremes = {}
         for chan, i, m in zip(exists, self.idxmaxs[idx], self.maxima[idx]):
-
             extremes[chan] = {"time": self.time[i], "val": m}
 
         return extremes
