@@ -171,7 +171,14 @@ class LoadsAnalysis:
         self._summary_stats = ss.unstack().swaplevel(axis=1)
 
         # Extreme events
-        self._extremes = extremes
+        extreme_table = {}
+        for _, d in extremes.items():
+            for channel, sub in d.items():
+                if channel not in extreme_table.keys():
+                    extreme_table[channel] = []
+
+                extreme_table[channel].append(sub)
+        self._extremes = extreme_table
 
         # Damage equivalent loads
         dels = pd.DataFrame(dels).T

@@ -123,9 +123,20 @@ class OpenFASTBase:
         sorter = np.argsort(self.channels)
         exists = [c for c in channels if c in self.channels]
         idx = sorter[np.searchsorted(self.channels, exists, sorter=sorter)]
+
         extremes = {}
-        for chan, i, m in zip(exists, self.idxmaxs[idx], self.maxima[idx]):
-            extremes[chan] = {"time": self.time[i], "val": m}
+        for chan, i in zip(exists, idx):
+            idx_max = self.idxmaxs[i]
+            extremes[chan] = {}
+            
+            for var in exists:
+                extremes[chan][var] = {
+                    'time': self.time[idx_max],
+                    'val': self[var][idx_max]
+                }
+
+        # for chan, i, m in zip(exists, self.idxmaxs[idx], self.maxima[idx]):
+        #     extremes[chan] = {"time": self.time[i], "val": m}
 
         return extremes
 
