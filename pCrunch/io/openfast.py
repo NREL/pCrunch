@@ -127,16 +127,10 @@ class OpenFASTBase:
         extremes = {}
         for chan, i in zip(exists, idx):
             idx_max = self.idxmaxs[i]
-            extremes[chan] = {}
-            
-            for var in exists:
-                extremes[chan][var] = {
-                    'time': self.time[idx_max],
-                    'val': self[var][idx_max]
-                }
-
-        # for chan, i, m in zip(exists, self.idxmaxs[idx], self.maxima[idx]):
-        #     extremes[chan] = {"time": self.time[i], "val": m}
+            extremes[chan] = {
+                "time": self.time[idx_max],
+                **dict(zip(exists, self.data[idx_max, idx])),
+            }
 
         return extremes
 
