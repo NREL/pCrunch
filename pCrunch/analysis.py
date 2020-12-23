@@ -36,6 +36,9 @@ class LoadsAnalysis:
         magnitude_channels : dict (optional)
             Additional channels as vector magnitude of other channels.
             Format: 'new-chan': ['chan1', 'chan2', 'chan3']
+        trim_data : tuple
+            Trim processed outputs to desired times.
+            Format: (min, max)
         """
 
         self.outputs = outputs
@@ -48,6 +51,7 @@ class LoadsAnalysis:
         self._ec = kwargs.get("extreme_channels", [])
         self._mc = kwargs.get("magnitude_channels", {})
         self._fc = kwargs.get("fatigue_channels", {})
+        self._td = kwargs.get("trim_data", ())
 
     def process_outputs(self, cores=1, **kwargs):
         """
@@ -64,7 +68,7 @@ class LoadsAnalysis:
         self.post_process(stats, extremes, dels, **kwargs)
 
     def _process_serial(self, **kwargs):
-        """"""
+        """Process outputs in serieal in serial."""
 
         summary_stats = {}
         extremes = {}
@@ -81,7 +85,13 @@ class LoadsAnalysis:
         return summary_stats, extremes, DELs
 
     def _process_parallel(self, cores, **kwargs):
-        """"""
+        """
+        Process outputs in parallel.
+
+        Parameters
+        ----------
+        cores : int
+        """
 
         summary_stats = {}
         extremes = {}
@@ -126,6 +136,9 @@ class LoadsAnalysis:
                 data, channels, dlc, magnitude_channels=self._mc
             )
 
+        if self._td:
+            output.trim_data(*self._td)
+
         stats = self.get_summary_stats(output, **kwargs)
         extremes = output.extremes(self._ec)
         dels = self.get_DELs(output, **kwargs)
@@ -158,7 +171,14 @@ class LoadsAnalysis:
         return fstats
 
     def get_extreme_events(self, output, channels, **kwargs):
-        """"""
+        """
+        Returns extreme events of `output`.
+
+        Parameters
+        ----------
+        output : OpenFASTOutput
+        channels : list
+        """
 
         return output.extremes(channels)
 
