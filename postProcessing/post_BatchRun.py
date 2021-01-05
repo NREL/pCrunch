@@ -16,7 +16,7 @@ import pathlib
 # fast_pl = ROSCO_utilites.FAST_Plots()
 # WEIS modules
 from weis.aeroelasticse.Util import FileTools
-from ofTools.fast_io.output_processing import output_processing
+from ROSCO_toolbox.ofTools.fast_io.output_processing import output_processing
 # Batch Analysis
 from pCrunch import pdTools
 from pCrunch import Processing, Analysis
@@ -82,13 +82,6 @@ if __name__ == '__main__':
 # AEP = pp.AEP(stats)
 # print('AEP = {}'.format(AEP))
 
-    # ========== Plotting ==========
-    #  --- Time domain analysis --- 
-    filenames = [outfiles[0], outfiles[1]] # select the 2nd run from each dataset
-    cases = {'Baseline': ['Wind1VelX', 'GenPwr', 'BldPitch1', 'GenTq', 'RotSpeed']}
-    fast_io = output_processing()
-    fast_dict = fast_io.load_fast_out(filenames, tmin=0)
-    fast_io.plot_fast_out(fast_dict,cases)
 
 # # Plot some spectral cases
 # spec_cases = [('RootMyb1', 0), ('TwrBsFyt', 0)]

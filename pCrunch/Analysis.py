@@ -10,7 +10,7 @@ import seaborn as sns
 import fatpack # 3rd party module used for rainflow counting
 
 from scipy.interpolate import PchipInterpolator
-from ofTools.fast_io.output_processing import output_processing
+from ROSCO_toolbox.ofTools.fast_io.output_processing import output_processing
 
 from pCrunch import pdTools
 
