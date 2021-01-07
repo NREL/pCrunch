@@ -15,7 +15,6 @@ except:
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from ROSCO_toolbox.utilities import FAST_IO
 
 from pCrunch import Analysis, pdTools
 
@@ -301,13 +300,14 @@ class FAST_Processing(object):
             stats = pdTools.df2dict(dft)
 
             # Get load rankings after stats are loaded
-            load_rankings = loads_analysis.load_ranking(stats) 
+            load_rankings = loads_analysis.load_ranking(stats, names=self.dataset_names) 
 
         else: # run analysis in serial
             stats = []
             load_rankings = []
             for file_sets in filenames:
-                st, lr = loads_analysis.full_loads_analysis(file_sets, get_load_ranking=True)
+                st, lr = loads_analysis.full_loads_analysis(file_sets, get_load_ranking=True, 
+                                            names=self.dataset_names)
                 stats.append(st)
                 load_rankings.append(lr)
             
@@ -323,7 +323,7 @@ def get_windspeeds(case_matrix, return_df=False):
     Parameters:
     ----------
     case_matrix: dict
-        case matrix data loaded from wisdem.aeroelasticse.Util.FileTools.load_yaml
+        case matrix data loaded from weis.aeroelasticse.Util.FileTools.load_yaml
     
     Returns:
     --------
@@ -348,7 +348,7 @@ def get_windspeeds(case_matrix, return_df=False):
     seed = []
     IECtype = []
     # loop through and parse each inflow filename text entry to get wind and seed #
-    for fname in  cmatrix[('InflowWind','Filename')]:
+    for fname in  cmatrix[('InflowWind','FileName_BTS')]:
         if '.bts' in fname:
             obj = fname.split('U')[-1].split('_')
             obj2 = obj[1].split('Seed')[-1].split('.bts')
@@ -382,7 +382,7 @@ def get_windspeeds(case_matrix, return_df=False):
 
 
 def save_yaml(outdir, fname, data_out):
-    ''' Save yaml file - ripped from WISDEM 
+    ''' Save yaml file - ripped from WEIS 
     
     Parameters:
     -----------
@@ -407,7 +407,7 @@ def save_yaml(outdir, fname, data_out):
 
 
 def load_yaml(fname_input, package=0):
-    ''' Import a .yaml file - ripped from WISDEM
+    ''' Import a .yaml file - ripped from WEIS
 
     Parameters:
     -----------
