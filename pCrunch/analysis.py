@@ -60,12 +60,17 @@ class LoadsAnalysis:
         """
 
         if cores > 1:
-            stats, extremes, dels = self._process_parallel(cores, **kwargs)
+            stats, extrs, dels = self._process_parallel(cores, **kwargs)
 
         else:
-            stats, extremes, dels = self._process_serial(**kwargs)
+            stats, extrs, dels = self._process_serial(**kwargs)
 
-        self.post_process(stats, extremes, dels, **kwargs)
+        summary_stats, extremes, DELs = self.post_process(
+            stats, extrs, dels, **kwargs
+        )
+        self._summary_stats = summary_stats
+        self._extremes = extremes
+        self._dels = DELs
 
     def _process_serial(self, **kwargs):
         """Process outputs in serieal in serial."""
@@ -182,13 +187,14 @@ class LoadsAnalysis:
 
         return output.extremes(channels)
 
-    def post_process(self, stats, extremes, dels, **kwargs):
+    @staticmethod
+    def post_process(stats, extremes, dels, **kwargs):
         """Post processes internal data to produce DataFrame outputs."""
 
         # Summary statistics
         ss = pd.DataFrame.from_dict(stats, orient="index").stack().to_frame()
         ss = pd.DataFrame(ss[0].values.tolist(), index=ss.index)
-        self._summary_stats = ss.unstack().swaplevel(axis=1)
+        summary_stats = ss.unstack().swaplevel(axis=1)
 
         # Extreme events
         extreme_table = {}
@@ -198,11 +204,12 @@ class LoadsAnalysis:
                     extreme_table[channel] = []
 
                 extreme_table[channel].append(sub)
-        self._extremes = extreme_table
+        extremes = extreme_table
 
         # Damage equivalent loads
         dels = pd.DataFrame(dels).T
-        self._dels = dels
+
+        return summary_stats, extremes, dels
 
     def read_file(self, f):
         """
