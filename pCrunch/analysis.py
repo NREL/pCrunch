@@ -122,24 +122,15 @@ class LoadsAnalysis:
 
         Parameters
         ----------
-        f : str | tuple
+        f : str | OpenFASTOutput
             Path to output or direct output in dict format.
         """
 
         if isinstance(f, str):
-            if self._directory:
-                fp = os.path.join(self._directory, f)
-
-            else:
-                fp = f
-
-            output = self.read_file(fp)
+            output = self.read_file(f)
 
         else:
-            data, channels, dlc = f
-            output = OpenFASTOutput(
-                data, channels, dlc, magnitude_channels=self._mc
-            )
+            output = f
 
         if self._td:
             output.trim_data(*self._td)
