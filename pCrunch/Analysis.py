@@ -175,7 +175,7 @@ class Loads_Analysis(object):
                     sum_stats[channel]['std'].append(float(np.std(y_data)))
                     sum_stats[channel]['mean'].append(float(np.mean(y_data)))
                     sum_stats[channel]['abs'].append(float(max(np.abs(y_data))))
-                    sum_stats[channel]['integrated'].append(float(np.trapz(fd['Time'], y_data)))
+                    sum_stats[channel]['integrated'].append(float(y_data, np.trapz(fd['Time'])))
 
                     if len(self.channels_extreme_table) > 0:
                         # outputting user specifed channels at the time where the maximum value occurs
