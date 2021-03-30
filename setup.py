@@ -26,7 +26,7 @@ REQUIRED = [
 ]
 
 ROOT = os.path.abspath(os.path.dirname(__file__))
-with open("README.md", "r") as fh:
+with open("README.rst", "r") as fh:
     long_description = fh.read()
 
 setup(
@@ -45,12 +45,24 @@ setup(
     install_requires=[
         "matplotlib",
         "numpy",
-        "pytest",
         "scipy",
         "pyYAML",
         "seaborn",
         "fatpack",
     ],
+    extras_require={
+        "dev": [
+            "pre-commit",
+            "pylint",
+            "flake8",
+            "black",
+            "isort",
+            "pytest",
+            "pytest-cov",
+            "sphinx",
+            "sphinx-rtd-theme",
+        ]
+    },
     license="Apache License, Version 2.0",
     classifiers=[
         "Development Status :: 4 - Beta",
