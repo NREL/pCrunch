@@ -54,15 +54,13 @@ To set up pCrunch for development, follow these steps:
 Examples
 --------
 
-For an up to date example of the core functionalities, see example.ipynb. More
+For an up to date example of the core functionalities, see `example.ipynb`. More
 examples coming soon.
 
 Other Scripts
 -------------
 
-.. warning::
-
-    These scripts may not have been updated since the move to version 0.2.0.
+Warning: These scripts have not been updated since the move to version 0.2.0.
 
 There are also several utility scripts provided in this repo. The HPC_tools
 folder contains utility functions for working on the NREL HPC. postProcessing
