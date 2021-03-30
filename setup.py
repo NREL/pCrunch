@@ -35,7 +35,15 @@ VERSION = "0.0.1"
 
 # These packages are required for all of the code to be executed.
 # - Maybe you can get away with older versions...
-REQUIRED = ["matplotlib", "numpy", "pytest", "scipy", "pyYAML", "seaborn"]
+REQUIRED = [
+    "matplotlib",
+    "numpy",
+    "pytest",
+    "scipy",
+    "pyYAML",
+    "seaborn",
+    "fatpack",
+]
 
 # Read the docs, one day, so we'll throw it in here!
 EXTRAS = {
