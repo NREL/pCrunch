@@ -9,12 +9,11 @@
 # CONDITIONS OF ANY KIND, either express or implied. See the License for the
 # specific language governing permissions and limitations under the License.
 
-import io
 import os
-import sys
-from shutil import rmtree
 
-from setuptools import Command, setup, find_packages
+from setuptools import setup, find_packages
+
+import versioneer
 
 REQUIRED = [
     "matplotlib",
@@ -32,7 +31,8 @@ with open("README.md", "r") as fh:
 
 setup(
     name="pCrunch",
-    version="0.0.1",
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     description="IO and Post Processing Interface for OpenFAST Results.",
     long_description=long_description,
     long_description_content_type="text/markdown",
