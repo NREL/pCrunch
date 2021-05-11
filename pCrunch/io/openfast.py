@@ -128,7 +128,7 @@ class OpenFASTBase:
         for chan, i in zip(exists, idx):
             idx_max = self.idxmaxs[i]
             extremes[chan] = {
-                "time": self.time[idx_max],
+                "Time": self.time[idx_max],
                 **dict(zip(exists, self.data[idx_max, idx])),
             }
 
