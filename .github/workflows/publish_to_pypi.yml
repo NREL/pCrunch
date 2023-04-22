@@ -13,10 +13,6 @@ on:
 jobs:
     build_and_upload_pypi:
         runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false
-            matrix:
-                python-version: ["3.9", "3.10", "3.11"]
                 
         # upload to PyPI on every tag starting with 'v'
         #if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
@@ -26,20 +22,20 @@ jobs:
             - name: checkout repository
               uses: actions/checkout@v3
 
-            - name: Set up Python ${{ matrix.python-version }}
+            - name: Set up Python
               uses: actions/setup-python@v4
               id: cp
               with:
-                  python-version: ${{ matrix.python-version }}
+                  python-version: "3.11"
                   update-environment: true
 
             - name: Install pypa/build
               run: |
-                  python -m pip install build
+                  '${{ steps.cp.outputs.python-path }}' -m pip install build
 
             - name: Build a binary wheel and a source tarball
               run: |
-                  python -m build .
+                  '${{ steps.cp.outputs.python-path }}' -m build .
 
             - uses: pypa/gh-action-pypi-publish@v1.8.5
               with:
