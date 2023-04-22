@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pCrunch"
-dynamic = ["version"]
+version = "1.0.1"
 description = "IO and Post Processing Interface for OpenFAST Results."
 readme = "README.rst"
 requires-python = ">=3.9"
@@ -86,17 +86,6 @@ namespaces = true
 # If there are data files included in your packages that need to be
 # installed, specify them here.
 "*" = ["*.out", "*.outb", "*.txt", "*.rst", "*.ipynb"]
-
-[tool.setuptools-git-versioning]
-enabled = true
-
-[tool.versioneer]
-VCS = "git"
-style = "pep440"
-versionfile_source = "pCrunch/_version.py"
-versionfile_build = "pCrunch/_version.py"
-tag_prefix = ""
-parentdir_prefix = "pCrunch-"
 
 [tool.black]
 line-length = 88
