@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pCrunch"
-version = "1.0.1"
+version = "1.0.2"
 description = "IO and Post Processing Interface for OpenFAST Results."
 readme = "README.rst"
 requires-python = ">=3.9"
@@ -42,7 +42,7 @@ classifiers = [  # Optional
   "Programming Language :: Fortran",
 ]
 
-dependencies = ["matplotlib", "numpy", "scipy", "pyyaml", "seaborn", "fatpack"]
+dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "scipy"]
 
 # List additional groups of dependencies here (e.g. development
 # dependencies). Users will be able to install these using the "extras"
