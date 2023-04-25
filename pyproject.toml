@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pCrunch"
-version = "1.0.2"
+version = "1.0.3"
 description = "IO and Post Processing Interface for OpenFAST Results."
 readme = "README.rst"
 requires-python = ">=3.9"
