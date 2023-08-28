@@ -7,7 +7,6 @@ __email__ = ["jake.nunemaker@nrel.gov"]
 import os
 import multiprocessing as mp
 from functools import partial
-
 import numpy as np
 import pandas as pd
 import fatpack
@@ -138,13 +137,13 @@ class LoadsAnalysis:
         DELs = {}
         Damage = {}
 
-        pool = mp.Pool(cores)
+        pool = mp.Pool(processes=cores)
         returned = pool.map(
             partial(self._process_output, **kwargs), self.outputs
         )
         pool.close()
         pool.join()
-
+        
         for filename, stats, extrs, dels, damage in returned:
             summary_stats[filename] = stats
             extremes[filename] = extrs
@@ -423,7 +422,7 @@ class LoadsAnalysis:
             Whether to apply Goodman mean correction to loads and stress
             Default: False
         return_damage: boolean
-            Whether to compute both DEL and true damage
+            Whether to compute both DEL and damage
             Default: False
         """
 
@@ -582,3 +581,5 @@ class PowerProduction:
             perf_data[var] = perf_array[var]
 
         return AEP, perf_data
+
+    
