@@ -6,7 +6,7 @@ __email__ = ["jake.nunemaker@nrel.gov"]
 
 import numpy as np
 
-from .openfast import OpenFASTAscii, OpenFASTBinary, OpenFASTOutput
+from .openfast import OpenFASTAscii, OpenFASTBinary
 
 
 def load_FAST_out(filenames, tmin=0, tmax=np.inf, **kwargs):
