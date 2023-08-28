@@ -227,6 +227,11 @@ def get_windspeeds(case_matrix, return_df=False):
             windspeed.append(float(obj))
             seed.append([])
             IECtype.append("EWS")
+            
+        else:
+            print("Shouldn't get here")
+            print(fname)
+            breakpoint()
 
     if return_df:
         case_matrix = pd.DataFrame(case_matrix)
