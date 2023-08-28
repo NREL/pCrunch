@@ -3,13 +3,11 @@ __copyright__ = "Copyright 2020, National Renewable Energy Laboratory"
 __maintainer__ = "Jake Nunemaker"
 __email__ = ["jake.nunemaker@nrel.gov"]
 
-
-import numpy as np
-
-from .openfast import OpenFASTAscii, OpenFASTBinary, OpenFASTOutput
+# Need all these for import here in __init__ even if not used in code below
+from pCrunch.io.openfast import OpenFASTAscii, OpenFASTBinary, OpenFASTOutput
 
 
-def load_FAST_out(filenames, tmin=0, tmax=np.inf, **kwargs):
+def load_FAST_out(filenames, tmin=0, tmax=float('inf'), **kwargs):
     """
     Load a list of OpenFAST files.
 
