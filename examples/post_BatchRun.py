@@ -31,7 +31,6 @@ if __name__ == '__main__':
     results_dir = os.path.join(output_dir, "results")
     save_results = True
 
-
     # Find outfiles
     outfiles = [
         os.path.join(output_dir, f)

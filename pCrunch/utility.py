@@ -210,23 +210,21 @@ def get_windspeeds(case_matrix, return_df=False):
             if "NTM" in fname:
                 IECtype.append("NTM")
             elif "ETM" in fname:
-                IECtype.append("ETM")
+                IECtype.append("NTM")
             elif "EWM" in fname:
                 IECtype.append("EWM")
             else:
-                print("Shouldn't get here")
-                print(fname)
-                breakpoint()
+                IECtype.append("")
 
         elif "ECD" in fname:
-            obj = fname.split("U")[-1].split(".wnd")[0].split("_")[0]
-            windspeed.append(float(obj[0]))
+            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+            windspeed.append(float(obj))
             seed.append([])
             IECtype.append("ECD")
 
         elif "EWS" in fname:
-            obj = fname.split("U")[-1].split(".wnd")[0].split("_")[0]
-            windspeed.append(float(obj[0]))
+            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+            windspeed.append(float(obj))
             seed.append([])
             IECtype.append("EWS")
             
