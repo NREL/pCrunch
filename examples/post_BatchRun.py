@@ -9,13 +9,7 @@ from fnmatch import fnmatch
 
 #import numpy as np
 import pandas as pd
-try:
-    import ruamel_yaml as ry
-except:
-    try:
-        import ruamel.yaml as ry
-    except:
-        raise ImportError("No module named ruamel.yaml or ruamel_yaml")
+import ruamel.yaml as ry
 
 from pCrunch import LoadsAnalysis, PowerProduction, FatigueParams
 #from pCrunch.io import load_FAST_out

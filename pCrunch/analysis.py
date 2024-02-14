@@ -430,6 +430,13 @@ class LoadsAnalysis:
         return_damage = kwargs.get("return_damage", False)
         goodman = kwargs.get("goodman_correction", False)
         Scin = Sc if Sc > 0.0 else Sult
+
+        # Default return values
+        DEL = np.nan
+        D   = np.nan
+
+        if np.all(np.isnan(ts)):
+            return DEL, D
         
         # Working with loads for DELs
         try:

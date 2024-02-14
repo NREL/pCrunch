@@ -35,3 +35,8 @@ jobs:
             - name: Test run
               run: |
                   '${{ steps.cp.outputs.python-path }}' -m pytest -v --disable-warnings pCrunch
+
+            - name: Test examples
+              run: |
+                  cd examples
+                  treon example.ipynb

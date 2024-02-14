@@ -54,7 +54,7 @@ dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "scipy"]
 # projects.
 [project.optional-dependencies] # Optional
 dev = ["pre-commit", "pylint", "flake8", "black", "isort"]
-test = ["pytest", "pytest-cov"]
+test = ["pytest", "pytest-cov", "treon"]
 docs = ["sphinx", "sphinx_rtd_theme"]
 
 # List URLs that are relevant to your project
