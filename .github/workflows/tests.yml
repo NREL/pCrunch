@@ -37,9 +37,9 @@ jobs:
                   '${{ steps.cp.outputs.python-path }}' -m pytest -v --disable-warnings pCrunch
     
             # Debugging session
-            - name: Setup tmate session
-              if: contains( matrix.os, 'ubuntu')
-              uses: mxschmitt/action-tmate@v3
+            #- name: Setup tmate session
+            #  if: contains( matrix.os, 'ubuntu')
+            #  uses: mxschmitt/action-tmate@v3
 
             - name: Test examples
               run: |
