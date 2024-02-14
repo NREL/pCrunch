@@ -39,4 +39,4 @@ jobs:
             - name: Test examples
               run: |
                   cd examples
-                  treon -v example.ipynb
+                  pytest --nbval -v example.ipynb
