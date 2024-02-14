@@ -42,7 +42,7 @@ classifiers = [  # Optional
   "Programming Language :: Fortran",
 ]
 
-dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "scipy"]
+dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy"]
 
 # List additional groups of dependencies here (e.g. development
 # dependencies). Users will be able to install these using the "extras"
