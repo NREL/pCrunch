@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pCrunch"
-version = "1.0.5"
+version = "1.1.0"
 description = "IO and Post Processing Interface for OpenFAST Results."
 readme = "README.rst"
 requires-python = ">=3.9"
@@ -60,7 +60,7 @@ dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy"]
 # projects.
 [project.optional-dependencies] # Optional
 dev = ["pre-commit", "pylint", "flake8", "black", "isort"]
-test = ["pytest", "pytest-cov", "nbval"]
+test = ["pytest", "pytest-cov", "treon"]
 docs = ["sphinx", "sphinx_rtd_theme"]
 
 # List URLs that are relevant to your project

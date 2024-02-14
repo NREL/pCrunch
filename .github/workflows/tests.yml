@@ -30,7 +30,7 @@ jobs:
 
             - name: Pip Install 
               run: |
-                  '${{ steps.cp.outputs.python-path }}' -m pip install -vv -e .[test]
+                  '${{ steps.cp.outputs.python-path }}' -m pip install -v -e .[test]
 
             - name: Test run
               run: |
@@ -44,4 +44,4 @@ jobs:
             - name: Test examples
               run: |
                   cd examples
-                  pytest --nbval -v example.ipynb
+                  treon -v example.ipynb
