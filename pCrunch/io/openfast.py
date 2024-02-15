@@ -103,7 +103,7 @@ class OpenFASTBase:
                 normed = np.linalg.norm(arrays, axis=1).reshape(arrays.shape[0], 1)
             except:
                 normed = np.nan * np.ones((self.data.shape[0],1))
-                
+
             self.data = np.append(self.data, normed, axis=1)
             self.channels = np.append(self.channels, new_chan)
 
@@ -262,7 +262,7 @@ class OpenFASTOutput(OpenFASTBase):
         self._data = data
 
         if isinstance(channels, list):
-            self.channels = np.array(channels)
+            self.channels = np.array([c.strip() for c in channels])
 
         else:
             self.channels = channels
@@ -370,9 +370,8 @@ class OpenFASTBinary(OpenFASTBase):
         channels = np.fromfile(
             f, np.uint8, self._chan_chars * (num_channels + 1)
         ).reshape((num_channels + 1), self._chan_chars)
-        self.channels = np.array(
-            list("".join(map(chr, c)).strip() for c in channels)
-        )
+        channels_list = list("".join(map(chr, c)) for c in channels)
+        self.channels = np.array( [c.strip() for c in channels_list] )
 
         units = np.fromfile(
             f, np.uint8, self._unit_chars * (num_channels + 1)
@@ -474,5 +473,5 @@ class OpenFASTAscii(OpenFASTBase):
     def build_headers(self, chandata, unitdata):
         """Unpacks channels and units and builds the combined headers."""
 
-        self.channels = np.array([c for c in chandata.split("\t")])
+        self.channels = np.array([c.strip() for c in chandata.split("\t")])
         self.units = np.array([u[1:-1] for u in unitdata.split("\t")])

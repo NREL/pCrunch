@@ -30,8 +30,18 @@ jobs:
 
             - name: Pip Install 
               run: |
-                  '${{ steps.cp.outputs.python-path }}' -m pip install -vv -e .[test]
+                  '${{ steps.cp.outputs.python-path }}' -m pip install -v -e .[test]
 
             - name: Test run
               run: |
                   '${{ steps.cp.outputs.python-path }}' -m pytest -v --disable-warnings pCrunch
+    
+            # Debugging session
+            #- name: Setup tmate session
+            #  if: contains( matrix.os, 'ubuntu')
+            #  uses: mxschmitt/action-tmate@v3
+
+            - name: Test examples
+              run: |
+                  cd examples
+                  treon -v example.ipynb

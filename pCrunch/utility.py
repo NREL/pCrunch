@@ -6,9 +6,9 @@ __email__ = ["nikhar.abbas@nrel.gov", "jake.nunemaker@nrel.gov"]
 
 import os
 
-import yaml
 import pandas as pd
-from yaml import Dumper, Loader
+#from yaml import Dumper, Loader
+import ruamel.yaml as ry
 
 
 def df2dict(df):
@@ -70,8 +70,17 @@ def save_yaml(outdir, fname, data):
     if not os.path.isdir(outdir):
         os.makedirs(outdir)
 
-    with open(filepath, "w") as f:
-        yaml.dump(data, f, Dumper=Dumper, default_flow_style=False)
+    #with open(filepath, "w") as f:
+    #    yaml.dump(data, f, Dumper=Dumper, default_flow_style=False)
+        
+    # Write yaml with updated values
+    myyaml = ry.YAML()
+    myyaml.default_flow_style = None
+    myyaml.width = float("inf")
+    myyaml.indent(mapping=4, sequence=6, offset=3)
+    myyaml.allow_unicode = False
+    with open(filepath, "w", encoding="utf-8") as f:
+        myyaml.dump(data, f)
 
 
 def load_yaml(filepath):
@@ -84,8 +93,12 @@ def load_yaml(filepath):
         File to load.
     """
 
-    with open(filepath) as f:
-        data = yaml.load(f, Loader=Loader)
+    reader = ry.YAML(typ="safe", pure=True)
+    with open(filepath, "r", encoding="utf-8") as f:
+        data = reader.load(f)
+    
+    #with open(filepath) as f:
+    #    data = yaml.load(f, Loader=Loader)
 
     return data
 
