@@ -456,7 +456,7 @@ class OpenFASTAscii(OpenFASTBase):
 
         for _line in f:
 
-            line = _line.replace(b"\xb7", b"-").decode().strip()
+            line = _line.replace(b"\xb7", b"-").decode('latin-1').strip()
             data.append(line)
 
             if _start:
