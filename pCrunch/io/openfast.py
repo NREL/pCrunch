@@ -455,8 +455,10 @@ class OpenFASTAscii(OpenFASTBase):
         data = []
 
         for _line in f:
-
-            line = _line.replace(b"\xb7", b"-").decode().strip()
+            try:
+                line = _line.replace(b"\xb7", b"-").decode(encoding="ascii").strip()
+            except Exception:
+                line = _line.replace(b"\xb7", b"-").decode(encoding="utf-16").strip()
             data.append(line)
 
             if _start:
