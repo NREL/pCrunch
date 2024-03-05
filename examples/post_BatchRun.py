@@ -13,7 +13,7 @@ import ruamel.yaml as ry
 
 from pCrunch import LoadsAnalysis, PowerProduction, FatigueParams
 #from pCrunch.io import load_FAST_out
-from pCrunch.utility import save_yaml, get_windspeeds, convert_summary_stats
+from pCrunch.utility import load_yaml, save_yaml, get_windspeeds, convert_summary_stats
 
 
 def valid_extension(fp):
@@ -72,8 +72,7 @@ if __name__ == '__main__':
 
     # Load case matrix into dataframe
     fname_case_matrix = os.path.join(output_dir, "case_matrix.yaml")
-    with open(fname_case_matrix, "r") as f:
-        case_matrix = ry.load(f, Loader=ry.Loader)
+    case_matrix = load_yaml(fname_case_matrix)
     cm = pd.DataFrame(case_matrix)
 
     # Get wind speeds for processed runs
