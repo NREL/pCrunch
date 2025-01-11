@@ -1,5 +1,5 @@
 import numpy as np
-from io import AeroelasticOutput
+from .aeroelastic_output import AeroelasticOutput
 
 def read(filename, **kwargs):
     """
@@ -75,7 +75,7 @@ class OpenFASTBinary(AeroelasticOutput):
         """
 
         super().__init__()
-        self.set_filename( filepath )
+        self.filepath = filepath
         self._chan_chars = kwargs.get("chan_char_length", 10)
         self._unit_chars = kwargs.get("unit_char_length", 10)
         self.magnitude_channels = kwargs.get("magnitude_channels", {})
@@ -85,7 +85,7 @@ class OpenFASTBinary(AeroelasticOutput):
     def read(self):
         """Reads the binary file."""
 
-        with open(self._filepath, "rb") as f:
+        with open(self.filepath, "rb") as f:
             self.fmt = np.fromfile(f, np.int16, 1)[0]
 
             if self.fmt == 4:
@@ -107,7 +107,7 @@ class OpenFASTBinary(AeroelasticOutput):
 
             length = np.fromfile(f, np.int32, 1)[0]
             chars = np.fromfile(f, np.uint8, length)
-            self._desc = "".join(map(chr, chars)).strip()
+            self.description = "".join(map(chr, chars)).strip()
 
             # Build headers
             channels = np.fromfile(
@@ -166,7 +166,7 @@ class OpenFASTAscii(AeroelasticOutput):
         """
 
         super().__init__()
-        self._filepath = filepath
+        self.filepath = filepath
         self.magnitude_channels = kwargs.get("magnitude_channels", {})
         self.read()
 
@@ -177,7 +177,7 @@ class OpenFASTAscii(AeroelasticOutput):
     def read(self):
         """Reads the ASCII file."""
 
-        with open(self._filepath, "rb") as f:
+        with open(self.filepath, "rb") as f:
             chandata, unitdata = self.parse_header(f)
             self.build_headers(chandata, unitdata)
             self.data = np.fromfile(f, float, sep="\t").reshape(
@@ -205,7 +205,7 @@ class OpenFASTAscii(AeroelasticOutput):
             if line.startswith("Time"):
                 _start = True
 
-        self._desc = " ".join([h.replace('"', "") for h in data[:-2]]).strip()
+        self.description = " ".join([h.replace('"', "") for h in data[:-2]]).strip()
 
         chandata, unitdata = data[-2:]
         return chandata, unitdata

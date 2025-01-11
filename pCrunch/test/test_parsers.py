@@ -9,7 +9,7 @@ import fnmatch
 
 import pytest
 
-from pCrunch.io import OpenFASTAscii, OpenFASTBinary
+from pCrunch import OpenFASTAscii, OpenFASTBinary, read
 
 DIR = os.path.split(__file__)[0]
 DATA = os.path.join(DIR, "data")
@@ -32,6 +32,24 @@ def test_OpenFASTBinary(fn):
     filepath = os.path.join(DATA, fn)
     output = OpenFASTBinary(filepath)
     output.read()
+
+    assert output.data.shape
+    assert output.channels.shape
+
+@pytest.mark.parametrize("fn", fnmatch.filter(os.listdir(DATA), "*.out"))
+def test_readerAscii(fn):
+
+    filepath = os.path.join(DATA, fn)
+    output = read(filepath)
+
+    assert output.data.shape
+    assert output.channels.shape
+
+@pytest.mark.parametrize("fn", fnmatch.filter(os.listdir(DATA), "*.outb"))
+def test_readerBinary(fn):
+
+    filepath = os.path.join(DATA, fn)
+    output = read(filepath)
 
     assert output.data.shape
     assert output.channels.shape

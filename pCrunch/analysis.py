@@ -4,6 +4,86 @@ import numpy as np
 import pandas as pd
 import fatpack
 
+
+def compute_del(ts, elapsed, lifetime, load2stress, slope, Sult, Sc=0.0, **kwargs):
+    """
+    Computes damage equivalent load of input `ts`.
+
+    Parameters
+    ----------
+    ts : np.array
+        Time series to calculate DEL for.
+    elapsed : int | float
+        Elapsed time of the time series.
+    lifetime : int | float
+        Design lifetime of the component / material in years
+    load2stress : float (optional)
+        Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
+    slope : int | float
+        Slope of the fatigue curve.
+    Sult : float (optional)
+        Ultimate stress for use in Goodman equivalent stress calculation
+    Sc : float (optional)
+        Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
+    rainflow_bins : int
+        Number of bins used in rainflow analysis.
+        Default: 100
+    goodman_correction: boolean
+        Whether to apply Goodman mean correction to loads and stress
+        Default: False
+    return_damage: boolean
+        Whether to compute both DEL and damage
+        Default: False
+    """
+
+    bins = kwargs.get("rainflow_bins", 100)
+    return_damage = kwargs.get("return_damage", False)
+    goodman = kwargs.get("goodman_correction", False)
+    Scin = Sc if Sc > 0.0 else Sult
+
+    # Default return values
+    DEL = np.nan
+    D   = np.nan
+
+    if np.all(np.isnan(ts)):
+        return DEL, D
+
+    # Working with loads for DELs
+    try:
+        F, Fmean = fatpack.find_rainflow_ranges(ts, return_means=True)
+    except Exception:
+        F = Fmean = np.zeros(1)
+    if goodman and np.abs(load2stress) > 0.0:
+        F = fatpack.find_goodman_equivalent_stress(F, Fmean, Sult/np.abs(load2stress))
+    Nrf, Frf = fatpack.find_range_count(F, bins)
+    DELs = Frf ** slope * Nrf / elapsed
+    DEL = DELs.sum() ** (1.0 / slope)
+    # With fatpack do:
+    #curve = fatpack.LinearEnduranceCurve(1.)
+    #curve.m = slope
+    #curve.Nc = elapsed
+    #DEL = curve.find_miner_sum(np.c_[Frf, Nrf]) ** (1 / slope)
+
+    # Compute Palmgren/Miner damage using stress
+    D = np.nan # default return value
+    if return_damage and np.abs(load2stress) > 0.0:
+        try:
+            S, Mrf = fatpack.find_rainflow_ranges(ts*load2stress, return_means=True)
+        except Exception:
+            S = Mrf = np.zeros(1)
+        if goodman:
+            S = fatpack.find_goodman_equivalent_stress(S, Mrf, Sult)
+        Nrf, Srf = fatpack.find_range_count(S, bins)
+        curve = fatpack.LinearEnduranceCurve(Scin)
+        curve.m = slope
+        curve.Nc = 1
+        D = curve.find_miner_sum(np.c_[Srf, Nrf])
+        if lifetime > 0.0:
+            D *= lifetime*365.0*24.0*60.0*60.0 / elapsed
+
+    return DEL, D
+
+
 # Could use a dict or namedtuple here, but this standardizes things a bit better for users
 class FatigueParams:
     """Simple data structure of parameters needed by fatigue calculation."""
@@ -26,10 +106,10 @@ class FatigueParams:
             Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
         """
 
-        self.lifetime = float(lifetime)
+        self.lifetime    = float(lifetime)
         self.load2stress = float(load2stress)
-        self.slope = float(slope)
-        self.ult_stress = float(ult_stress)
+        self.slope       = float(slope)
+        self.ult_stress  = float(ult_stress)
         self.S_intercept = float(S_intercept) if float(S_intercept) > 0.0 else self.ult_stress
 
     def copy(self):
@@ -70,11 +150,11 @@ class LoadsAnalysis:
     def parse_settings(self, **kwargs):
         """Parses settings from input kwargs."""
 
-        self._directory = kwargs.get("directory", None)
-        self._ec = kwargs.get("extreme_channels", True)
-        self._mc = kwargs.get("magnitude_channels", {})
-        self._fc = kwargs.get("fatigue_channels", {})
-        self._td = kwargs.get("trim_data", ())
+        self.directory = kwargs.get("directory", None)
+        self.ec = kwargs.get("extreme_channels", True)
+        self.mc = kwargs.get("magnitude_channels", {})
+        self.fc = kwargs.get("fatigue_channels", {})
+        self.td = kwargs.get("trim_data", ())
         
     def process_outputs(self, cores=1, **kwargs):
         """
@@ -83,68 +163,31 @@ class LoadsAnalysis:
         """
 
         if cores > 1:
-            stats, extrs, dels, damage = self._process_parallel(cores, **kwargs)
+            pool = mp.Pool(processes=cores)
+            returned = pool.map(
+                partial(self.process_single, **kwargs), self.outputs
+            )
+            pool.close()
+            pool.join()
 
         else:
-            stats, extrs, dels, damage = self._process_serial(**kwargs)
+            returned = [self.process_single(output, **kwargs) for output in self.outputs]
 
-        summary_stats, extremes, DELs, Damage = self.post_process(
-            stats, extrs, dels, damage, **kwargs
-        )
-        self._summary_stats = summary_stats
-        self._extremes = extremes
-        self._dels = DELs
-        self._damage = Damage
+        stats  = {}
+        extrs  = {}
+        dels   = {}
+        damage = {}
 
-    def _process_serial(self, **kwargs):
-        """Process outputs in serieal in serial."""
-
-        summary_stats = {}
-        extremes = {}
-        DELs = {}
-        Damage = {}
-
-        for output in self.outputs:
-            filename, stats, extrs, dels, damage = self._process_output(
-                output, **kwargs
-            )
-            summary_stats[filename] = stats
-            extremes[filename] = extrs
-            DELs[filename] = dels
-            Damage[filename] = damage
-
-        return summary_stats, extremes, DELs, Damage
-
-    def _process_parallel(self, cores, **kwargs):
-        """
-        Process outputs in parallel.
-
-        Parameters
-        ----------
-        cores : int
-        """
-
-        summary_stats = {}
-        extremes = {}
-        DELs = {}
-        Damage = {}
-
-        pool = mp.Pool(processes=cores)
-        returned = pool.map(
-            partial(self._process_output, **kwargs), self.outputs
-        )
-        pool.close()
-        pool.join()
+        for ifile, istats, iextrs, idels, idamage in returned:
+            stats[ifile]  = istats
+            extrs[ifile]  = iextrs
+            dels[ifile]   = idels
+            damage[ifile] = idamage
+            
+        self.summary_stats, self.extremes, self.dels, self.damage = self.post_process(stats, extrs, dels, damage)
         
-        for filename, stats, extrs, dels, damage in returned:
-            summary_stats[filename] = stats
-            extremes[filename] = extrs
-            DELs[filename] = dels
-            Damage[filename] = damage
 
-        return summary_stats, extremes, DELs, Damage
-
-    def _process_output(self, f, **kwargs):
+    def process_single(self, f, **kwargs):
         """
         Process OpenFAST output `f`.
 
@@ -160,61 +203,57 @@ class LoadsAnalysis:
         else:
             output = f
 
-        if self._td:
-            output.trim_data(*self._td)
+        if self.td:
+            output.trim_data(*self.td)
 
-        stats = self.get_summary_stats(output, **kwargs)
+        stats = output.get_summary_stats()
 
-        if self._ec is True:
-            extremes = output.extremes(output.channels)
+        if self.ec is True:
+            extremes = output.extremes()
 
-        elif isinstance(self._ec, list):
-            extremes = output.extremes(self._ec)
+        elif isinstance(self.ec, list):
+            extremes = output.extremes(self.ec)
 
         dels, damage = self.get_DELs(output, **kwargs)
 
         return output.filename, stats, extremes, dels, damage
 
-    def get_summary_stats(self, output, **kwargs):
+    
+    def get_DELs(self, output, **kwargs):
         """
-        Appends summary statistics to `self._summary_statistics` for each file.
+        Appends computed damage equivalent loads for fatigue channels in
+        `self.fc`.
 
         Parameters
         ----------
         output : OpenFASTOutput
         """
 
-        fstats = {}
-        for channel in output.channels:
-            if channel in ["time", "Time"]:
-                continue
+        DELs = {}
+        D = {}
 
-            fstats[channel] = {
-                "min": float(min(output[channel])),
-                "max": float(max(output[channel])),
-                "std": float(np.std(output[channel])),
-                "mean": float(np.mean(output[channel])),
-                "median": float(np.median(output[channel])),
-                "abs": float(max(np.abs(output[channel]))),
-                "integrated": float(np.trapz(output[channel], x=output["Time"])),
-            }
+        for chan, fatparams in self.fc.items():
 
-        return fstats
+            try:
 
-    def get_extreme_events(self, output, channels, **kwargs):
-        """
-        Returns extreme events of `output`.
+                DELs[chan], D[chan] = self.compute_del(
+                    output[chan], output.elapsed_time,
+                    fatparams.lifetime,
+                    fatparams.load2stress, fatparams.slope,
+                    fatparams.ult_stress, fatparams.S_intercept,
+                    **kwargs
+                )
 
-        Parameters
-        ----------
-        output : OpenFASTOutput
-        channels : list
-        """
+            except IndexError:
+                print(f"Channel '{chan}' not included in DEL calculation.")
+                DELs[chan] = np.NaN
+                D[chan] = np.NaN
 
-        return output.extremes(channels)
+        return DELs, D
+
 
     @staticmethod
-    def post_process(stats, extremes, dels, damage, **kwargs):
+    def post_process(stats, extremes, dels, damage):
         """Post processes internal data to produce DataFrame outputs."""
 
         # Summary statistics
@@ -290,153 +329,6 @@ class LoadsAnalysis:
             out.append(res)
 
         return pd.DataFrame(out, columns=["file", "channel", "stat", "val"])
-
-    @property
-    def summary_stats(self):
-        """Returns summary statistics for all outputs in `self.outputs`."""
-
-        if getattr(self, "_summary_stats", None) is None:
-            raise ValueError("Outputs have not been processed.")
-
-        return self._summary_stats
-
-    @property
-    def extreme_events(self):
-        """Returns extreme events for all files and channels in `self._ec`."""
-
-        if getattr(self, "_extremes", None) is None:
-            raise ValueError("Outputs have not been processed.")
-
-        return self._extremes
-
-    @property
-    def DELs(self):
-        """Returns damage equivalent loads for all channels in `self._fc`"""
-
-        if getattr(self, "_dels", None) is None:
-            raise ValueError("Outputs have not been processed.")
-
-        return self._dels
-
-    @property
-    def damage(self):
-        """Returns Palmgren/Miner damage for all channels in `self._fc`"""
-
-        if getattr(self, "_damage", None) is None:
-            raise ValueError("Outputs have not been processed.")
-
-        return self._damage
-
-    def get_DELs(self, output, **kwargs):
-        """
-        Appends computed damage equivalent loads for fatigue channels in
-        `self._fc`.
-
-        Parameters
-        ----------
-        output : OpenFASTOutput
-        """
-
-        DELs = {}
-        D = {}
-
-        for chan, fatparams in self._fc.items():
-
-            try:
-
-                DELs[chan], D[chan] = self._compute_del(
-                    output[chan], output.elapsed_time,
-                    fatparams.lifetime,
-                    fatparams.load2stress, fatparams.slope,
-                    fatparams.ult_stress, fatparams.S_intercept,
-                    **kwargs
-                )
-
-            except IndexError:
-                print(f"Channel '{chan}' not included in DEL calculation.")
-                DELs[chan] = np.NaN
-                D[chan] = np.NaN
-
-        return DELs, D
-
-    @staticmethod
-    def _compute_del(ts, elapsed, lifetime, load2stress, slope, Sult, Sc=0.0, **kwargs):
-        """
-        Computes damage equivalent load of input `ts`.
-
-        Parameters
-        ----------
-        ts : np.array
-            Time series to calculate DEL for.
-        elapsed : int | float
-            Elapsed time of the time series.
-        lifetime : int | float
-            Design lifetime of the component / material in years
-        load2stress : float (optional)
-            Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
-        slope : int | float
-            Slope of the fatigue curve.
-        Sult : float (optional)
-            Ultimate stress for use in Goodman equivalent stress calculation
-        Sc : float (optional)
-            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
-        rainflow_bins : int
-            Number of bins used in rainflow analysis.
-            Default: 100
-        goodman_correction: boolean
-            Whether to apply Goodman mean correction to loads and stress
-            Default: False
-        return_damage: boolean
-            Whether to compute both DEL and damage
-            Default: False
-        """
-
-        bins = kwargs.get("rainflow_bins", 100)
-        return_damage = kwargs.get("return_damage", False)
-        goodman = kwargs.get("goodman_correction", False)
-        Scin = Sc if Sc > 0.0 else Sult
-
-        # Default return values
-        DEL = np.nan
-        D   = np.nan
-
-        if np.all(np.isnan(ts)):
-            return DEL, D
-        
-        # Working with loads for DELs
-        try:
-            F, Fmean = fatpack.find_rainflow_ranges(ts, return_means=True)
-        except Exception:
-            F = Fmean = np.zeros(1)
-        if goodman and np.abs(load2stress) > 0.0:
-            F = fatpack.find_goodman_equivalent_stress(F, Fmean, Sult/np.abs(load2stress))
-        Nrf, Frf = fatpack.find_range_count(F, bins)
-        DELs = Frf ** slope * Nrf / elapsed
-        DEL = DELs.sum() ** (1.0 / slope)
-        # With fatpack do:
-        #curve = fatpack.LinearEnduranceCurve(1.)
-        #curve.m = slope
-        #curve.Nc = elapsed
-        #DEL = curve.find_miner_sum(np.c_[Frf, Nrf]) ** (1 / slope)
-
-        # Compute Palmgren/Miner damage using stress
-        D = np.nan # default return value
-        if return_damage and np.abs(load2stress) > 0.0:
-            try:
-                S, Mrf = fatpack.find_rainflow_ranges(ts*load2stress, return_means=True)
-            except Exception:
-                S = Mrf = np.zeros(1)
-            if goodman:
-                S = fatpack.find_goodman_equivalent_stress(S, Mrf, Sult)
-            Nrf, Srf = fatpack.find_range_count(S, bins)
-            curve = fatpack.LinearEnduranceCurve(Scin)
-            curve.m = slope
-            curve.Nc = 1
-            D = curve.find_miner_sum(np.c_[Srf, Nrf])
-            if lifetime > 0.0:
-                D *= lifetime*365.0*24.0*60.0*60.0 / elapsed
-                
-        return DEL, D
 
 
 class PowerProduction:

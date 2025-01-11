@@ -17,14 +17,14 @@ def dataproperty(f):
 class AeroelasticOutput:
     """Base timeseries aeroelastic simulation data output class."""
 
-    def __init__(self, datain=None, channelsin=None, dlc=None, **kwargs):
+    def __init__(self, datain=None, channelsin=None, **kwargs):
         # Initialize all properties
         self.data        = None
         self.channels    = None
         self.description = None
         self.units       = None
         self.filepath    = None
-        self.dlc         = dlc
+        self.dlc         = kwargs.get("dlc", {})
         self.magnitude_channels = None
 
         self.set_data(datain, channelsin)
@@ -45,7 +45,7 @@ class AeroelasticOutput:
 
     def set_data(self, datain, channelsin=None):
         if isinstance(datain, dict):
-            self.channels = list(datain.keys())
+            self.channels = np.array([c.strip() for c in list(datain.keys())]) 
             self.data     = np.array(list(datain.values())).T
             
         elif isinstance(datain, list):
@@ -53,8 +53,12 @@ class AeroelasticOutput:
             self.data     = np.array(datain)
             
         elif isinstance(datain, pd.DataFrame):
-            self.channels = list(datain.columns)
+            self.channels = np.array([c.strip() for c in list(datain.columns)])
             self.data     = datain.to_numpy()
+
+        elif isinstance(datain, np.ndarray):
+            self.channels = np.array([c.strip() for c in channelsin])
+            self.data     = datain
 
         else:
             pass
@@ -142,9 +146,11 @@ class AeroelasticOutput:
                 for k in range(self.num_channels)
             ]
 
-    def extremes(self, channels):
+    def extremes(self, channels=None):
         """"""
-
+        if channels is None:
+            channels = list(self.channels)
+            
         sorter = np.argsort(self.channels)
         exists = [c for c in channels if c in self.channels]
         idx = sorter[np.searchsorted(self.channels, exists, sorter=sorter)]
@@ -265,3 +271,25 @@ class AeroelasticOutput:
             self.fourth_moments[self.variable]
         ) / self.second_moments[self.variable] ** 2
         return kurtosis.flatten()
+
+    def get_summary_stats(self):
+        """
+        Appends summary statistics to `self.summary_statistics` for each file.
+        """
+
+        fstats = {}
+        for channel in self.channels:
+            if channel in ["time", "Time"]:
+                continue
+
+            fstats[channel] = {
+                "min": float(min(self[channel])),
+                "max": float(max(self[channel])),
+                "std": float(np.std(self[channel])),
+                "mean": float(np.mean(self[channel])),
+                "median": float(np.median(self[channel])),
+                "abs": float(max(np.abs(self[channel]))),
+                "integrated": float(np.trapz(self[channel], x=self["Time"])),
+            }
+
+        return fstats
