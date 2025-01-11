@@ -1,7 +1,5 @@
-import os
-
 import numpy as np
-from pCruncio.io import TimeseriesBase
+from io import AeroelasticOutput
 
 def read(filename, **kwargs):
     """
@@ -64,7 +62,7 @@ def load_FAST_out(filenames, tmin=0, tmax=float('inf'), **kwargs):
 
 
 
-class OpenFASTBinary(TimeseriesBase):
+class OpenFASTBinary(AeroelasticOutput):
     """OpenFAST binary output class."""
 
     def __init__(self, filepath, **kwargs):
@@ -111,9 +109,31 @@ class OpenFASTBinary(TimeseriesBase):
             chars = np.fromfile(f, np.uint8, length)
             self._desc = "".join(map(chr, chars)).strip()
 
-            self.build_headers(f, num_channels)
-            time = self.build_time(f, time_info, num_timesteps)
+            # Build headers
+            channels = np.fromfile(
+                f, np.uint8, self._chan_chars * (num_channels + 1)
+            ).reshape((num_channels + 1), self._chan_chars)
+            channels_list = list("".join(map(chr, c)) for c in channels)
+            self.channels = np.array( [c.strip() for c in channels_list] )
 
+            units = np.fromfile(
+                f, np.uint8, self._unit_chars * (num_channels + 1)
+            ).reshape((num_channels + 1), self._unit_chars)
+            self.units = np.array(
+                list("".join(map(chr, c)).strip()[1:-1] for c in units)
+            )
+            
+            # Build time
+            if self.fmt == 1:
+                scale, offset = time_info
+                data = np.fromfile(f, np.int32, num_timesteps)
+                time = (data - offset) / scale
+
+            else:
+                t1, incr = time_info
+                time = t1 + incr * np.arange(num_timesteps)
+
+            # Build the data
             if self.fmt == 3:
                 raw = np.fromfile(f, np.float64, count=num_points).reshape(num_timesteps, num_channels)
                 self.data = np.concatenate([time.reshape(num_timesteps, 1),
@@ -127,58 +147,8 @@ class OpenFASTBinary(TimeseriesBase):
 
         self.append_magnitude_channels()
 
-    def build_headers(self, f, num_channels):
-        """
-        Builds the channels, units and headers arrays.
 
-        Parameters
-        ----------
-        f : file
-        num_channels : int
-        """
-
-        channels = np.fromfile(
-            f, np.uint8, self._chan_chars * (num_channels + 1)
-        ).reshape((num_channels + 1), self._chan_chars)
-        channels_list = list("".join(map(chr, c)) for c in channels)
-        self.channels = np.array( [c.strip() for c in channels_list] )
-
-        units = np.fromfile(
-            f, np.uint8, self._unit_chars * (num_channels + 1)
-        ).reshape((num_channels + 1), self._unit_chars)
-        self.units = np.array(
-            list("".join(map(chr, c)).strip()[1:-1] for c in units)
-        )
-
-    def build_time(self, f, info, length):
-        """
-        Builds the time index based on the file format and index info.
-
-        Parameters
-        ----------
-        f : file
-        info : tuple
-            Time index meta information, ('scale', 'offset') or ('t1', 'incr').
-
-        Returns
-        -------
-        np.ndarray
-            Time index for `self.data`.
-        """
-
-        if self.fmt == 1:
-            scale, offset = info
-            data = np.fromfile(f, np.int32, length)
-            time = (data - offset) / scale
-
-        else:
-            t1, incr = info
-            time = t1 + incr * np.arange(length)
-
-        return time
-
-
-class OpenFASTAscii(TimeseriesBase):
+class OpenFASTAscii(AeroelasticOutput):
     """
     OpenFAST ASCII output class.
 

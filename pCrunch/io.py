@@ -19,12 +19,12 @@ class AeroelasticOutput:
 
     def __init__(self, datain=None, channelsin=None, dlc=None, **kwargs):
         # Initialize all properties
-        self.data = None
-        self.channels = None
+        self.data        = None
+        self.channels    = None
         self.description = None
-        self.units = None
-        self.filepath = None
-        self.dlc = dlc
+        self.units       = None
+        self.filepath    = None
+        self.dlc         = dlc
         self.magnitude_channels = None
 
         self.set_data(datain, channelsin)
@@ -87,7 +87,7 @@ class AeroelasticOutput:
     @time.setter
     def time(self, time):
         if "Time" in self.channels:
-            raise ValueError(f"'Time' channel already exists in output data.")
+            raise ValueError("'Time' channel already exists in output data.")
 
         self.data = np.append(time, self.data, axis=1)
         self.channels = np.append("Time", self.channels)
