@@ -62,7 +62,7 @@ if __name__ == '__main__':
         trim_data=(0,),
     )
     la.process_outputs(cores=3, return_damage=True, goodman=True)
-
+    breakpoint()
     if save_results:
         save_yaml(
             results_dir,

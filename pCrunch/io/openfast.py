@@ -1,13 +1,32 @@
-__author__ = ["Jake Nunemaker"]
-__copyright__ = "Copyright 2020, National Renewable Energy Laboratory"
-__maintainer__ = "Jake Nunemaker"
-__email__ = ["jake.nunemaker@nrel.gov"]
-
-
 import os
 
 import numpy as np
 from pCruncio.io import TimeseriesBase
+
+def read(filename, **kwargs):
+    """
+    Load a single OpenFAST file.
+
+    Parameters
+    ----------
+    filename : Path object or string
+        OpenFAST file to load.
+
+    Returns
+    -------
+    output
+        OpenFASTOutput instances
+    """
+
+    try:
+        output = OpenFASTAscii(filename, **kwargs)
+        output.read()
+
+    except UnicodeDecodeError:
+        output = OpenFASTBinary(filename, **kwargs)
+        output.read()
+
+    return output
 
 
 def load_OpenFAST_batch(filenames, tmin=0, tmax=float('inf'), **kwargs):
@@ -33,23 +52,17 @@ def load_OpenFAST_batch(filenames, tmin=0, tmax=float('inf'), **kwargs):
 
     fastout = []
     for fn in filenames:
-
-        try:
-            output = OpenFASTAscii(fn, **kwargs)
-            output.read()
-
-        except UnicodeDecodeError:
-            output = OpenFASTBinary(fn, **kwargs)
-            output.read()
-
+        output = read(fn, **kwargs)
         output.trim_data(tmin, tmax)
         fastout.append(output)
 
     return fastout
 
 def load_FAST_out(filenames, tmin=0, tmax=float('inf'), **kwargs):
-    # Backwards compatibility with old name
+    """ Backwards compatibility with old name """
     return load_OpenFAST_batch(filenames, tmin=tmin, tmax=tmax, **kwargs)
+
+
 
 class OpenFASTBinary(TimeseriesBase):
     """OpenFAST binary output class."""
@@ -63,20 +76,18 @@ class OpenFASTBinary(TimeseriesBase):
         filepath : path-like
         """
 
-        self.filepath = filepath
+        super().__init__()
+        self.set_filename( filepath )
         self._chan_chars = kwargs.get("chan_char_length", 10)
         self._unit_chars = kwargs.get("unit_char_length", 10)
-        self._magnitude_channels = kwargs.get("magnitude_channels", {})
+        self.magnitude_channels = kwargs.get("magnitude_channels", {})
         self.read()
-
-    @property
-    def filename(self):
-        return os.path.split(self.filepath)[-1]
+        self.fmt = 0
 
     def read(self):
         """Reads the binary file."""
 
-        with open(self.filepath, "rb") as f:
+        with open(self._filepath, "rb") as f:
             self.fmt = np.fromfile(f, np.int16, 1)[0]
 
             if self.fmt == 4:
@@ -89,12 +100,12 @@ class OpenFASTBinary(TimeseriesBase):
             time_info = np.fromfile(f, np.float64, 2)
 
             if self.fmt == 3:
-                self.slopes = np.ones(num_channels)
-                self.offset = np.zeros(num_channels)
+                slopes = np.ones(num_channels)
+                offset = np.zeros(num_channels)
 
             else:
-                self.slopes = np.fromfile(f, np.float32, num_channels)
-                self.offset = np.fromfile(f, np.float32, num_channels)
+                slopes = np.fromfile(f, np.float32, num_channels)
+                offset = np.fromfile(f, np.float32, num_channels)
 
             length = np.fromfile(f, np.int32, 1)[0]
             chars = np.fromfile(f, np.uint8, length)
@@ -104,24 +115,15 @@ class OpenFASTBinary(TimeseriesBase):
             time = self.build_time(f, time_info, num_timesteps)
 
             if self.fmt == 3:
-                raw = np.fromfile(f, np.float64, count=num_points).reshape(
-                    num_timesteps, num_channels
-                )
-                self.data = np.concatenate(
-                    [time.reshape(num_timesteps, 1), raw], 1
-                )
+                raw = np.fromfile(f, np.float64, count=num_points).reshape(num_timesteps, num_channels)
+                self.data = np.concatenate([time.reshape(num_timesteps, 1),
+                                            raw], 1)
 
             else:
-                raw = np.fromfile(f, np.int16, count=num_points).reshape(
-                    num_timesteps, num_channels
-                )
-                self.data = np.concatenate(
-                    [
-                        time.reshape(num_timesteps, 1),
-                        (raw - self.offset) / self.slopes,
-                    ],
-                    1,
-                )
+                raw = np.fromfile(f, np.int16, count=num_points).reshape(num_timesteps, num_channels)
+                self.data = np.concatenate([time.reshape(num_timesteps, 1),
+                                            (raw - offset) / slopes],
+                                           1)
 
         self.append_magnitude_channels()
 
@@ -193,13 +195,10 @@ class OpenFASTAscii(TimeseriesBase):
         filepath : path-like
         """
 
-        self.filepath = filepath
-        self._magnitude_channels = kwargs.get("magnitude_channels", {})
+        super().__init__()
+        self._filepath = filepath
+        self.magnitude_channels = kwargs.get("magnitude_channels", {})
         self.read()
-
-    @property
-    def filename(self):
-        return os.path.split(self.filepath)[-1]
 
     @property
     def time(self):
@@ -208,7 +207,7 @@ class OpenFASTAscii(TimeseriesBase):
     def read(self):
         """Reads the ASCII file."""
 
-        with open(self.filepath, "rb") as f:
+        with open(self._filepath, "rb") as f:
             chandata, unitdata = self.parse_header(f)
             self.build_headers(chandata, unitdata)
             self.data = np.fromfile(f, float, sep="\t").reshape(

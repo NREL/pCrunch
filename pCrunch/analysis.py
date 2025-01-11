@@ -1,17 +1,8 @@
-__author__ = ["Jake Nunemaker"]
-__copyright__ = "Copyright 2020, National Renewable Energy Laboratory"
-__maintainer__ = "Jake Nunemaker"
-__email__ = ["jake.nunemaker@nrel.gov"]
-
-
-import os
 import multiprocessing as mp
 from functools import partial
 import numpy as np
 import pandas as pd
 import fatpack
-
-from pCrunch.io import OpenFASTAscii, OpenFASTBinary #, OpenFASTOutput
 
 # Could use a dict or namedtuple here, but this standardizes things a bit better for users
 class FatigueParams:
@@ -46,6 +37,7 @@ class FatigueParams:
                              load2stress=self.load2stress, slope=self.slope,
                              ult_stress=self.ult_stress, S_intercept=self.S_intercept)
 
+    
 class LoadsAnalysis:
     """Implementation of `mlife` in python."""
 
@@ -246,33 +238,6 @@ class LoadsAnalysis:
 
         return summary_stats, extremes, dels, damage
 
-    def read_file(self, f):
-        """
-        Reads input file `f` and returns an instsance of one of the
-        `OpenFASTOutput` subclasses.
-
-        Parameters
-        ----------
-        f : str
-            Filename that is appended to `self.directory`
-        """
-
-        if self._directory:
-            fp = os.path.join(self._directory, f)
-
-        else:
-            fp = f
-
-        try:
-            output = OpenFASTAscii(fp, magnitude_channels=self._mc)
-            output.read()
-
-        except UnicodeDecodeError:
-            output = OpenFASTBinary(fp, magnitude_channels=self._mc)
-            output.read()
-
-        return output
-
     def get_load_rankings(self, ranking_vars, ranking_stats, **kwargs):
         """
         Returns load rankings across all outputs in `self.outputs`.
@@ -441,7 +406,7 @@ class LoadsAnalysis:
         # Working with loads for DELs
         try:
             F, Fmean = fatpack.find_rainflow_ranges(ts, return_means=True)
-        except:
+        except Exception:
             F = Fmean = np.zeros(1)
         if goodman and np.abs(load2stress) > 0.0:
             F = fatpack.find_goodman_equivalent_stress(F, Fmean, Sult/np.abs(load2stress))
@@ -459,7 +424,7 @@ class LoadsAnalysis:
         if return_damage and np.abs(load2stress) > 0.0:
             try:
                 S, Mrf = fatpack.find_rainflow_ranges(ts*load2stress, return_means=True)
-            except:
+            except Exception:
                 S = Mrf = np.zeros(1)
             if goodman:
                 S = fatpack.find_goodman_equivalent_stress(S, Mrf, Sult)

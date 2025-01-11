@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from scipy import stats
@@ -13,11 +14,21 @@ def dataproperty(f):
     return wrapper
 
 
-class TimeseriesBase:
+class AeroelasticOutput:
     """Base timeseries aeroelastic simulation data output class."""
 
-    def __init__(self, datain):
-        self._data = datain
+    def __init__(self, datain=None, channelsin=None, dlc=None, **kwargs):
+        # Initialize all properties
+        self.data = None
+        self.channels = None
+        self.description = None
+        self.units = None
+        self.filepath = None
+        self.dlc = dlc
+        self.magnitude_channels = None
+
+        self.set_data(datain, channelsin)
+        self.append_magnitude_channels( kwargs.get("magnitude_channels", {}) )
         
     def __getitem__(self, chan):
         try:
@@ -31,12 +42,24 @@ class TimeseriesBase:
     def __str__(self):
         return self.description
 
-    @property
-    def description(self):
-        return getattr(
-            self, "_desc", f"Unread OpenFAST output at '{self.filepath}'"
-        )
 
+    def set_data(self, datain, channelsin=None):
+        if isinstance(datain, dict):
+            self.channels = list(datain.keys())
+            self.data     = np.array(list(datain.values())).T
+            
+        elif isinstance(datain, list):
+            self.channels = np.array([c.strip() for c in channelsin])
+            self.data     = np.array(datain)
+            
+        elif isinstance(datain, pd.DataFrame):
+            self.channels = list(datain.columns)
+            self.data     = datain.to_numpy()
+
+        else:
+            pass
+        
+    
     def trim_data(self, tmin=0, tmax=np.inf):
         """
         Trims `self.data` to the data between `tmin` and `tmax`.
@@ -58,15 +81,6 @@ class TimeseriesBase:
         self.data = self.data[idx]
 
     @dataproperty
-    def data(self):
-        """Returns output data at `self._data`."""
-        return self._data
-
-    @data.setter
-    def data(self, data):
-        self._data = data
-
-    @dataproperty
     def time(self):
         return self["Time"]
 
@@ -78,17 +92,30 @@ class TimeseriesBase:
         self.data = np.append(time, self.data, axis=1)
         self.channels = np.append("Time", self.channels)
 
-    def append_magnitude_channels(self):
+    @property
+    def filename(self):
+        return os.path.split(self.filepath)[-1]
+        
+    def append_magnitude_channels(self, magnitude_channels=None):
         """
         Append the vector magnitude of `channels` to the dataset.
 
         Parameters
         ----------
-        self._magnitude_channels : dict
+        magnitude_channels : dict
             Format: 'new-chan' ['chan1', 'chan2', 'chan3'],
         """
 
-        for new_chan, chans in self._magnitude_channels.items():
+        if magnitude_channels is not None:
+            if not isinstance(magnitude_channels, dict):
+                raise ValueError("Expecting magnitude channels as a dictionary, 'new-chan': ['chan1', 'chan2', 'chan3']")
+            
+            if self.magnitude_channels is None:
+                self.magnitude_channels = magnitude_channels
+            else:
+                self.magnitude_channels.update(magnitude_channels)
+        
+        for new_chan, chans in self.magnitude_channels.items():
 
             if new_chan in self.channels:
                 print(f"Channel '{new_chan}' already exists.")
@@ -238,38 +265,3 @@ class TimeseriesBase:
             self.fourth_moments[self.variable]
         ) / self.second_moments[self.variable] ** 2
         return kurtosis.flatten()
-
-
-class AeroelasticOutput(TimeseriesBase):
-    def __init__(self, data, channels, dlc, **kwargs):
-        """
-        Creates an instance of `OpenFASTOutput`.
-
-        Parameters
-        ----------
-        data : np.ndarray
-        """
-
-        super().__init__(data)
-
-        if isinstance(channels, list):
-            self.channels = np.array([c.strip() for c in channels])
-
-        else:
-            self.channels = channels
-
-        self._dlc = dlc
-        self._magnitude_channels = kwargs.get("magnitude_channels", {})
-        self.append_magnitude_channels()
-
-    @property
-    def filename(self):
-        return self._dlc
-
-    @classmethod
-    def from_dict(cls, data, name, **kwargs):
-
-        channels = list(data.keys())
-        data = np.array(list(data.values())).T
-
-        return cls(data, channels, name, **kwargs)
