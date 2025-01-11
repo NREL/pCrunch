@@ -1,18 +1,10 @@
-__author__ = ["Nikhar Abbas", "Jake Nunemaker"]
-__copyright__ = "Copyright 2020, National Renewable Energy Laboratory"
-__maintainer__ = ["Nikhar Abbas", "Jake Nunemaker"]
-__email__ = ["nikhar.abbas@nrel.gov", "jake.nunemaker@nrel.gov"]
-
-
 import os
 from fnmatch import fnmatch
 
 #import numpy as np
 import pandas as pd
-import ruamel.yaml as ry
 
 from pCrunch import LoadsAnalysis, PowerProduction, FatigueParams
-#from pCrunch.io import load_FAST_out
 from pCrunch.utility import load_yaml, save_yaml, get_windspeeds, convert_summary_stats
 
 
@@ -62,7 +54,7 @@ if __name__ == '__main__':
         trim_data=(0,),
     )
     la.process_outputs(cores=3, return_damage=True, goodman=True)
-    breakpoint()
+
     if save_results:
         save_yaml(
             results_dir,

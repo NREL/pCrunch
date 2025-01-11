@@ -236,7 +236,7 @@ class LoadsAnalysis:
 
             try:
 
-                DELs[chan], D[chan] = self.compute_del(
+                DELs[chan], D[chan] = compute_del(
                     output[chan], output.elapsed_time,
                     fatparams.lifetime,
                     fatparams.load2stress, fatparams.slope,

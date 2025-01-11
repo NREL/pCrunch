@@ -7,7 +7,7 @@ from scipy import stats
 def dataproperty(f):
     @property
     def wrapper(self, *args, **kwargs):
-        if getattr(self, "_data", None) is None:
+        if getattr(self, "data", None) is None:
             raise AttributeError("Output has not been read yet.")
         return f(self, *args, **kwargs)
 
@@ -21,13 +21,18 @@ class AeroelasticOutput:
         # Initialize all properties
         self.data        = None
         self.channels    = None
-        self.description = None
+        self.description = ""
         self.units       = None
-        self.filepath    = None
-        self.dlc         = kwargs.get("dlc", {})
+        self.filepath    = ""
+        self.dlc         = ""
         self.magnitude_channels = None
 
+        for k in ["dlc", "DLC", "name", "Name", "NAME"]:
+            if k in kwargs:
+                self.dlc = kwargs.get(k, "")
+
         self.set_data(datain, channelsin)
+
         self.append_magnitude_channels( kwargs.get("magnitude_channels", {}) )
         
     def __getitem__(self, chan):
@@ -165,15 +170,19 @@ class AeroelasticOutput:
 
         return extremes
 
-    @dataproperty
-    def df(self):
+    def to_df(self):
         """Returns `self.data` as a DataFrame."""
 
         if self.channels is None:
             return pd.DataFrame(self.data)
+        else:
+            return pd.DataFrame(self.data, columns=self.channels)
 
-        return pd.DataFrame(self.data, columns=self.channels)
+    def to_dict(self):
+        """Returns `self.data` as a dictionary."""
 
+        return {self.channels[k]:self.data[:,k] for k in range(len(self.channels))}
+        
     @dataproperty
     def num_timesteps(self):
         return self.data.shape[0]
