@@ -16,49 +16,33 @@ def read(filename, **kwargs):
         OpenFASTOutput instances
     """
 
-    try:
-        output = OpenFASTAscii(filename, **kwargs)
-        output.read()
-
-    except UnicodeDecodeError:
-        output = OpenFASTBinary(filename, **kwargs)
-        output.read()
-
-    return output
-
-
-def load_OpenFAST_batch(filenames, tmin=0, tmax=float('inf'), **kwargs):
-    """
-    Load a list of OpenFAST files.
-
-    Parameters
-    ----------
-    filenames : list
-        List OpenFAST files to load.
-    tmin : float | int, optional
-        Initial line to trim output data to.
-    tmax : float | int, optional
-
-    Returns
-    -------
-    list
-        List of OpenFASTOutput instances
-    """
-
-    if isinstance(filenames, str):
-        filenames = [filenames]
-
+    batch_flag = isinstance(filename, (list, tuple, set))
+    filelist = filename if batch_flag else [filename]
+    
     fastout = []
-    for fn in filenames:
-        output = read(fn, **kwargs)
-        output.trim_data(tmin, tmax)
+    for k in filelist:
+        try:
+            output = OpenFASTAscii(k, **kwargs)
+            output.read()
+            
+        except UnicodeDecodeError:
+            output = OpenFASTBinary(k, **kwargs)
+            output.read()
+            
         fastout.append(output)
 
-    return fastout
+    if batch_flag:
+        return fastout
+    else:
+        return fastout[0]
 
+    
 def load_FAST_out(filenames, tmin=0, tmax=float('inf'), **kwargs):
     """ Backwards compatibility with old name """
-    return load_OpenFAST_batch(filenames, tmin=tmin, tmax=tmax, **kwargs)
+    fastout = read(filenames, tmin=tmin, tmax=tmax, **kwargs)
+    for k in fastout:
+        k.trim_data(tmin, tmax)
+    return fastout
 
 
 

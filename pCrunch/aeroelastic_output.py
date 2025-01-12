@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import pandas as pd
-from scipy import stats
+from scipy import stats, signal
 
 
 def dataproperty(f):
@@ -24,12 +24,12 @@ class AeroelasticOutput:
         self.description = ""
         self.units       = None
         self.filepath    = ""
-        self.dlc         = ""
         self.magnitude_channels = None
 
-        for k in ["dlc", "DLC", "name", "Name", "NAME"]:
-            if k in kwargs:
-                self.dlc = kwargs.get(k, "")
+        for k in ["dlc", "DLC", "name", "Name", "NAME", "filename","filepath","file"]:
+            self.filepath = kwargs.get(k, "")
+            if len(self.filepath) > 0:
+                break
 
         self.set_data(datain, channelsin)
 
@@ -178,6 +178,10 @@ class AeroelasticOutput:
         else:
             return pd.DataFrame(self.data, columns=self.channels)
 
+    @dataproperty
+    def df(self):
+        return self.to_df()
+        
     def to_dict(self):
         """Returns `self.data` as a dictionary."""
 
@@ -197,19 +201,19 @@ class AeroelasticOutput:
 
     @dataproperty
     def idxmins(self):
-        return np.argmin(self.data, axis=0)
+        return self.data.argmin(axis=0)
 
     @dataproperty
     def idxmaxs(self):
-        return np.argmax(self.data, axis=0)
+        return self.data.argmax(axis=0)
 
     @dataproperty
     def minima(self):
-        return np.min(self.data, axis=0)
+        return self.data.min(axis=0)
 
     @dataproperty
     def maxima(self):
-        return np.max(self.data, axis=0)
+        return self.data.max(axis=0)
 
     @dataproperty
     def ranges(self):
@@ -225,7 +229,7 @@ class AeroelasticOutput:
 
     @dataproperty
     def sums(self):
-        return np.sum(self.data, axis=0)
+        return self.data.sum(axis=0)
 
     @dataproperty
     def sums_squared(self):
@@ -253,52 +257,67 @@ class AeroelasticOutput:
 
     @dataproperty
     def means(self):
-        means = np.zeros(shape=(1, self.num_channels), dtype=np.float64)
-        means[:, self.constant] = self.minima[self.constant]
-        means[:, self.variable] = self.sums[self.variable] / self.num_timesteps
-        return means.flatten()
+        return self.data.mean(axis=0)
+
+    @dataproperty
+    def medians(self):
+        return np.median(self.data, axis=0)
+
+    @dataproperty
+    def absmaxima(self):
+        return np.abs(self.data).max(axis=0)
 
     @dataproperty
     def stddevs(self):
-        stddevs = np.zeros(shape=(1, self.num_channels), dtype=np.float64)
-        stddevs[:, self.variable] = np.sqrt(self.second_moments[self.variable])
-        return stddevs.flatten()
+        return self.data.std(axis=0)
 
     @dataproperty
     def skews(self):
-        skews = np.zeros(shape=(1, self.num_channels), dtype=np.float64)
-        skews[:, self.variable] = (
-            self.third_moments[self.variable]
-            / np.sqrt(self.second_moments[self.variable]) ** 3
-        )
-        return skews.flatten()
+        return self.third_moments / np.sqrt(self.second_moments) ** 3
 
     @dataproperty
     def kurtosis(self):
-        kurtosis = np.zeros(shape=(1, self.num_channels), dtype=np.float64)
-        kurtosis[:, self.variable] = (
-            self.fourth_moments[self.variable]
-        ) / self.second_moments[self.variable] ** 2
-        return kurtosis.flatten()
+        return self.fourth_moments / self.second_moments ** 2
+
+    @dataproperty
+    def integrated(self):
+        return np.trapz(self.data, self.time, axis=0)
+
+    @dataproperty
+    def psd(self):
+        fs = 1. / np.diff(self.time)[0]
+        freq, Pxx_den = signal.welch(self.data, fs, axis=0)    
+        return freq, Pxx_den
+
 
     def get_summary_stats(self):
         """
         Appends summary statistics to `self.summary_statistics` for each file.
         """
 
+        mins = self.minima
+        maxs = self.maxima
+        stds = self.stddevs
+        means = self.means
+        meds  = self.medians
+        abss  = self.absmaxima
+        intgs = self.integrated
+        
         fstats = {}
-        for channel in self.channels:
+        for k in range(len(self.channels)):
+            channel = self.channels[k]
+            
             if channel in ["time", "Time"]:
                 continue
 
             fstats[channel] = {
-                "min": float(min(self[channel])),
-                "max": float(max(self[channel])),
-                "std": float(np.std(self[channel])),
-                "mean": float(np.mean(self[channel])),
-                "median": float(np.median(self[channel])),
-                "abs": float(max(np.abs(self[channel]))),
-                "integrated": float(np.trapz(self[channel], x=self["Time"])),
+                "min": mins[k],
+                "max": maxs[k],
+                "std": stds[k],
+                "mean": means[k],
+                "median": meds[k],
+                "abs": abss[k],
+                "integrated": intgs[k],
             }
 
         return fstats

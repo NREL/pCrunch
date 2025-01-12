@@ -4,16 +4,17 @@ from fnmatch import fnmatch
 #import numpy as np
 import pandas as pd
 
-from pCrunch import LoadsAnalysis, PowerProduction, FatigueParams
+from pCrunch import LoadsAnalysis, PowerProduction, FatigueParams, read
 from pCrunch.utility import load_yaml, save_yaml, get_windspeeds, convert_summary_stats
 
 
 def valid_extension(fp):
-    return any([fnmatch(fp, ext) for ext in ["*.outb", "*.out"]])
+    #return any([fnmatch(fp, ext) for ext in ["*.outb", "*.out"]])
+    return fnmatch(fp, "*.outb")
 
 if __name__ == '__main__':
     # Define input files paths
-    output_dir = "/Users/gbarter/devel/WEIS/examples/05_IEA-3.4-130-RWT/temp/iea34"
+    output_dir = "/Users/gbarter/devel/WEIS/examples/03_NREL5MW_OC3_spar/outputs/03_OC3_optimization/openfast_runs"
     results_dir = os.path.join(output_dir, "results")
     save_results = True
 
@@ -46,8 +47,9 @@ if __name__ == '__main__':
     ]
 
     # Run pCrunch
+    outputs = read(outfiles)
     la = LoadsAnalysis(
-        outfiles,
+        outputs,
         magnitude_channels=magnitude_channels,
         fatigue_channels=fatigue_channels,
         extreme_channels=channel_extremes,
@@ -63,7 +65,7 @@ if __name__ == '__main__':
         )
 
     # Load case matrix into dataframe
-    fname_case_matrix = os.path.join(output_dir, "case_matrix.yaml")
+    fname_case_matrix = os.path.join(output_dir, "case_matrix_DLC1.1_0.yaml")
     case_matrix = load_yaml(fname_case_matrix)
     cm = pd.DataFrame(case_matrix)
 

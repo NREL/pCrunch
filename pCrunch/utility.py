@@ -203,41 +203,47 @@ def get_windspeeds(case_matrix, return_df=False):
     else:
         raise TypeError("case_matrix must be a dict or pd.DataFrame.")
 
-    windspeed = []
-    seed = []
-    IECtype = []
     # loop through and parse each inflow filename text entry to get wind and seed #
-    for fname in cmatrix[("InflowWind", "Filename_Uni")]:
-        if ".bts" in fname:
-            obj = fname.split("U")[-1].split("_")
-            obj2 = obj[1].split("Seed")[-1].split(".bts")
-            windspeed.append(float(obj[0]))
-            seed.append(float(obj2[0]))
-            if "NTM" in fname:
-                IECtype.append("NTM")
-            elif "ETM" in fname:
-                IECtype.append("NTM")
-            elif "EWM" in fname:
-                IECtype.append("EWM")
+    if ("InflowWind", "HWindSpeed") in cmatrix:
+        windspeed = [float(m) for m in cmatrix[("InflowWind", "HWindSpeed")]]
+        seed = [float(m) for m in cmatrix[("TurbSim", "RandSeed1")]]
+        IECtype = [None] * len(seed)
+
+    elif ("InflowWind", "Filename_Uni") in cmatrix:
+        windspeed = []
+        seed = []
+        IECtype = []
+        for fname in cmatrix[("InflowWind", "Filename_Uni")]:
+            if ".bts" in fname:
+                obj = fname.split("U")[-1].split("_")
+                obj2 = obj[1].split("Seed")[-1].split(".bts")
+                windspeed.append(float(obj[0]))
+                seed.append(float(obj2[0]))
+                if "NTM" in fname:
+                    IECtype.append("NTM")
+                elif "ETM" in fname:
+                    IECtype.append("NTM")
+                elif "EWM" in fname:
+                    IECtype.append("EWM")
+                else:
+                    IECtype.append("")
+
+            elif "ECD" in fname:
+                obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+                windspeed.append(float(obj))
+                seed.append([])
+                IECtype.append("ECD")
+
+            elif "EWS" in fname:
+                obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+                windspeed.append(float(obj))
+                seed.append([])
+                IECtype.append("EWS")
+
             else:
-                IECtype.append("")
-
-        elif "ECD" in fname:
-            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
-            windspeed.append(float(obj))
-            seed.append([])
-            IECtype.append("ECD")
-
-        elif "EWS" in fname:
-            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
-            windspeed.append(float(obj))
-            seed.append([])
-            IECtype.append("EWS")
-            
-        else:
-            print("Shouldn't get here")
-            print(fname)
-            breakpoint()
+                print("Shouldn't get here")
+                print(fname)
+                breakpoint()
 
     if return_df:
         case_matrix = pd.DataFrame(case_matrix)

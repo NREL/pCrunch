@@ -146,6 +146,7 @@ class LoadsAnalysis:
 
         self.outputs = outputs
         self.parse_settings(**kwargs)
+        
 
     def parse_settings(self, **kwargs):
         """Parses settings from input kwargs."""
@@ -187,7 +188,7 @@ class LoadsAnalysis:
         self.summary_stats, self.extremes, self.dels, self.damage = self.post_process(stats, extrs, dels, damage)
         
 
-    def process_single(self, f, **kwargs):
+    def process_single(self, output, **kwargs):
         """
         Process OpenFAST output `f`.
 
@@ -197,14 +198,11 @@ class LoadsAnalysis:
             Path to output or direct output in dict format.
         """
 
-        if isinstance(f, str):
-            output = self.read_file(f)
-
-        else:
-            output = f
-
         if self.td:
             output.trim_data(*self.td)
+
+        if self.mc:
+            output.append_magnitude_channels( self.mc )
 
         stats = output.get_summary_stats()
 
@@ -253,17 +251,17 @@ class LoadsAnalysis:
 
 
     @staticmethod
-    def post_process(stats, extremes, dels, damage):
+    def post_process(statsin, extremesin, delsin, damagein):
         """Post processes internal data to produce DataFrame outputs."""
 
         # Summary statistics
-        ss = pd.DataFrame.from_dict(stats, orient="index").stack().to_frame()
+        ss = pd.DataFrame.from_dict(statsin, orient="index").stack().to_frame()
         ss = pd.DataFrame(ss[0].values.tolist(), index=ss.index)
         summary_stats = ss.unstack().swaplevel(axis=1)
 
         # Extreme events
         extreme_table = {}
-        for _, d in extremes.items():
+        for _, d in extremesin.items():
             for channel, sub in d.items():
                 if channel not in extreme_table.keys():
                     extreme_table[channel] = []
@@ -272,8 +270,8 @@ class LoadsAnalysis:
         extremes = extreme_table
 
         # Damage and Damage Equivalent Loads
-        dels = pd.DataFrame(dels).T
-        damage = pd.DataFrame(damage).T
+        dels = pd.DataFrame(delsin).T
+        damage = pd.DataFrame(damagein).T
 
         return summary_stats, extremes, dels, damage
 
