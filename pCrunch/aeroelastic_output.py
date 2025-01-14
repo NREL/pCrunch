@@ -286,9 +286,22 @@ class AeroelasticOutput:
     @dataproperty
     def psd(self):
         fs = 1. / np.diff(self.time)[0]
-        freq, Pxx_den = signal.welch(self.data, fs, axis=0)    
+        freq, Pxx_den = signal.welch(self.data, fs, axis=0)
         return freq, Pxx_den
 
+    def time_averaging(self, time_window):
+        """
+        Applies averaging window on time-domain loads channels.  Window input is seconds
+        """
+        dt = np.diff(self.time)[0]
+        npts = time_window / dt
+        window = np.ones(npts) / npts # Basic rectangular filter
+
+        data_avg = np.zeros(self.data.shape)
+        for k in range(len(self.channels)):
+            data_avg[:,k] = np.convolve(self.data[:,k], window, 'valid')
+            
+        return data_avg
 
     def get_summary_stats(self):
         """
