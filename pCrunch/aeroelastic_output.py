@@ -300,8 +300,9 @@ class AeroelasticOutput:
         data_avg = np.zeros(self.data.shape)
         for k in range(len(self.channels)):
             data_avg[:,k] = np.convolve(self.data[:,k], window, 'valid')
-            
-        return data_avg
+
+        # Return a new AeroelasticOutput instance
+        return type(self)(data_avg, self.channels)
 
     def get_summary_stats(self):
         """
