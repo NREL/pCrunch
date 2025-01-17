@@ -294,7 +294,7 @@ class AeroelasticOutput:
         Applies averaging window on time-domain loads channels.  Window input is seconds
         """
         dt = np.diff(self.time)[0]
-        npts = time_window / dt
+        npts = int(time_window / dt)
         window = np.ones(npts) / npts # Basic rectangular filter
 
         data_avg = np.zeros(self.data.shape)
@@ -302,6 +302,28 @@ class AeroelasticOutput:
             data_avg[:,k] = np.convolve(self.data[:,k], window, 'valid')
             
         return data_avg
+    
+    def time_binning(self,time_window):
+        """
+        Bin the data into groups specified by time_window (in seconds)
+        Average (or, someday, other stats of those windows)
+        """
+
+        n_bins = int(np.ceil((self.time.max() - self.time.min()) / time_window))
+
+        data_binned = np.zeros((n_bins,self.data.shape[1]))
+
+        for i_bin in range(n_bins):
+            t_start = i_bin * time_window  + self.time.min()
+            t_end = (i_bin+1) * time_window    + self.time.min()
+            time_index = np.bitwise_and(self.time >= t_start, self.time < t_end)
+            if not np.any(time_index):
+                print('here')
+            data_filtered = self.data[time_index,:]
+            data_binned[i_bin,:] = np.mean(data_filtered,axis=0)
+
+        # Create dataframe
+        return pd.DataFrame(data=data_binned, columns=self.channels)
 
     def get_summary_stats(self):
         """
