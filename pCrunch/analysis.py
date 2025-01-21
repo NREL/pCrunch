@@ -3,7 +3,7 @@ from functools import partial
 import numpy as np
 import pandas as pd
 import fatpack
-
+from .utility import weibull_mean, rayleigh_mean
 
 def compute_del(ts, elapsed, lifetime, load2stress, slope, Sult, Sc=0.0, **kwargs):
     """
@@ -83,12 +83,12 @@ def compute_del(ts, elapsed, lifetime, load2stress, slope, Sult, Sc=0.0, **kwarg
 
     return DEL, D
 
-
+    
 # Could use a dict or namedtuple here, but this standardizes things a bit better for users
 class FatigueParams:
     """Simple data structure of parameters needed by fatigue calculation."""
 
-    def __init__(self, lifetime=0.0, load2stress=1.0, slope=4.0, ult_stress=1.0, S_intercept=0.0):
+    def __init__(self, **kwargs):
         """
         Creates an instance of `FatigueParams`.
 
@@ -104,21 +104,36 @@ class FatigueParams:
             Ultimate stress for use in Goodman equivalent stress calculation
         S_intercept : float (optional)
             Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
+        rainflow_bins : int
+            Number of bins used in rainflow analysis.
+            Default: 100
+        goodman_correction: boolean
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        return_damage: boolean
+            Whether to compute both DEL and damage
+            Default: False
         """
 
-        self.lifetime    = float(lifetime)
-        self.load2stress = float(load2stress)
-        self.slope       = float(slope)
-        self.ult_stress  = float(ult_stress)
-        self.S_intercept = float(S_intercept) if float(S_intercept) > 0.0 else self.ult_stress
+        self.lifetime      = kwargs.get("lifetime", 0.0)
+        self.load2stress   = kwargs.get("load2stress", 1.0)
+        self.slope         = kwargs.get("slope", 4.0)
+        self.ult_stress    = kwargs.get("ult_stress", 1.0)
+        temp               = kwargs.get("S_intercept", 0.0)
+        self.S_intercept   = temp if temp > 0.0 else self.ult_stress
+        self.bins          = kwargs.get("rainflow_bins", 100)
+        self.return_damage = kwargs.get("return_damage", False)
+        self.goodman       = kwargs.get("goodman_correction", False)
 
     def copy(self):
         return FatigueParams(lifetime=self.lifetime,
                              load2stress=self.load2stress, slope=self.slope,
-                             ult_stress=self.ult_stress, S_intercept=self.S_intercept)
+                             ult_stress=self.ult_stress, S_intercept=self.S_intercept,
+                             bins=self.bins, return_damage=self.return_damage,
+                             goodman=self.goodman)
 
     
-class LoadsAnalysis:
+class Crunch:
     """Implementation of `mlife` in python."""
 
     def __init__(self, outputs, **kwargs):
@@ -138,10 +153,12 @@ class LoadsAnalysis:
         magnitude_channels : dict (optional)
             Additional channels as vector magnitude of other channels.
             Format: 'new-chan': ['chan1', 'chan2', 'chan3']
-        trim_data : tuple
+        trim_data : tuple (optional)
             Trim processed outputs to desired times.
             Format: (min, max)
-        return_intermediate : bool
+        probability : list, tuple, or Numpy array (optional)
+            Probability or weighting for each output time series.
+            Should be a list or tuple or array of floats the same length as the `outputs` list
         """
 
         self.outputs = outputs
@@ -156,13 +173,32 @@ class LoadsAnalysis:
         self.mc = kwargs.get("magnitude_channels", {})
         self.fc = kwargs.get("fatigue_channels", {})
         self.td = kwargs.get("trim_data", ())
+        self.prob = kwargs.get("probability", [])
+
+        self.prep_outputs()
+
+    def prep_outputs(self):
+        """Trim the data by time, set magnitude channels and probability."""
+
+        for k in self.outputs:
+            if len(self.td) > 0:
+                k.trim_data(*self.td)
+
+            if len(self.mc) > 0:
+                k.append_magnitude_channels( self.mc )
+
+            if len(self.prob) == 0:
+                noutput = len(self.outputs)
+                self.prob = np.ones( noutput ) / float(noutput)
+            
+        
         
     def process_outputs(self, cores=1, **kwargs):
         """
         Processes all outputs for summary statistics and configured damage
         equivalent loads.
         """
-
+        
         if cores > 1:
             pool = mp.Pool(processes=cores)
             returned = pool.map(
@@ -197,13 +233,6 @@ class LoadsAnalysis:
         f : str | OpenFASTOutput
             Path to output or direct output in dict format.
         """
-
-        if self.td:
-            output.trim_data(*self.td)
-
-        if self.mc:
-            output.append_magnitude_channels( self.mc )
-
         stats = output.get_summary_stats()
 
         if self.ec is True:
@@ -225,13 +254,36 @@ class LoadsAnalysis:
         Parameters
         ----------
         output : OpenFASTOutput
+        rainflow_bins : int
+            Number of bins used in rainflow analysis.
+            Default: 100
+        goodman_correction: boolean
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        return_damage: boolean
+            Whether to compute both DEL and damage
+            Default: False
         """
 
         DELs = {}
         D = {}
 
         for chan, fatparams in self.fc.items():
+            if "goodman_correction" in kwargs:
+                goodman = kwargs.get("goodman_correction", False)
+            else:
+                goodman = fatparams.goodman
 
+            if "rainflow_bins" in kwargs:
+                bins = kwargs.get("rainflow_bins", 100)
+            else:
+                bins = fatparams.bins
+
+            if "return_damage" in kwargs:
+                return_damage = kwargs.get("return_damage", False)
+            else:
+                return_damage = fatparams.return_damage
+                
             try:
 
                 DELs[chan], D[chan] = compute_del(
@@ -239,7 +291,8 @@ class LoadsAnalysis:
                     fatparams.lifetime,
                     fatparams.load2stress, fatparams.slope,
                     fatparams.ult_stress, fatparams.S_intercept,
-                    **kwargs
+                    goodman_correction=goodman, rainflow_bins=bins,
+                    return_damage=return_damage,
                 )
 
             except IndexError:
@@ -275,6 +328,7 @@ class LoadsAnalysis:
 
         return summary_stats, extremes, dels, damage
 
+    
     def get_load_rankings(self, ranking_vars, ranking_stats, **kwargs):
         """
         Returns load rankings across all outputs in `self.outputs`.
@@ -298,150 +352,192 @@ class LoadsAnalysis:
 
             col = pd.MultiIndex.from_product([self.outputs, var])
             if stat in ["max", "abs"]:
-                res = (
-                    *summary_stats.loc[col][stat].idxmax(),
-                    stat,
-                    summary_stats.loc[col][stat].max(),
-                )
+                res = (*summary_stats.loc[col][stat].idxmax(),
+                       stat,
+                       summary_stats.loc[col][stat].max(),
+                       )
 
             elif stat == "min":
-                res = (
-                    *summary_stats.loc[col][stat].idxmin(),
-                    stat,
-                    summary_stats.loc[col][stat].min(),
-                )
+                res = (*summary_stats.loc[col][stat].idxmin(),
+                       stat,
+                       summary_stats.loc[col][stat].min(),
+                       )
 
             elif stat in ["mean", "std"]:
-                res = (
-                    np.NaN,
-                    ", ".join(var),
-                    stat,
-                    summary_stats.loc[col][stat].mean(),
-                )
+                res = (np.NaN, ", ".join(var), stat,
+                       summary_stats.loc[col][stat].mean(),
+                       )
 
             else:
-                raise NotImplementedError(
-                    f"Statistic '{stat}' not supported for load ranking."
-                )
+                raise NotImplementedError(f"Statistic '{stat}' not supported for load ranking.")
 
             out.append(res)
 
         return pd.DataFrame(out, columns=["file", "channel", "stat", "val"])
 
 
-class PowerProduction:
-    """Class to generate power production estimates."""
-
-    def __init__(self, turbine_class, **kwargs):
+    def _get_windspeeds(self, windspeed):
         """
-        Creates an instance of `PowerProduction`.
+        Returns the wind speeds in the output list if not already known.
 
         Parameters
         ----------
-        turbine_class : int
-        """
-
-        self.turbine_class = turbine_class
-
-    def prob_WindDist(self, windspeed, disttype="pdf"):
-        """
-        Generates the probability of a windspeed given the cumulative
-        distribution or probability density function of a Weibull distribution
-        per IEC 61400.
-
-        NOTE: This uses the range of wind speeds simulated over, so if the
-        simulated wind speed range is not indicative of operation range, using
-        this cdf to calculate AEP is invalid
-
-        Parameters
-        ----------
-        windspeed : float or list-like
-            wind speed(s) to calculate probability of
-        disttype : str, optional
-            type of probability, currently supports CDF or PDF
+        windspeed : str or list / Numpy array
+            If input as a list or array, it is simply returned (after checking for correct length).
+            If input as a string, then it should be the channel name of the u-velocity component
+            ('Wind1VelX` in OpenFAST)
 
         Returns
-        -------
-        p_bin : list
-            list containing probabilities per wind speed bin
-        """
-
-        if self.turbine_class in [1, "I"]:
-            Vavg = 50 * 0.2
-
-        elif self.turbine_class in [2, "II"]:
-            Vavg = 42.5 * 0.2
-
-        elif self.turbine_class in [3, "III"]:
-            Vavg = 37.5 * 0.2
-
-        # Define parameters
-        k = 2  # Weibull shape parameter
-        c = (2 * Vavg) / np.sqrt(np.pi)  # Weibull scale parameter
-
-        if disttype.lower() == "cdf":
-            # Calculate probability of wind speed based on WeibulCDF
-            wind_prob = 1 - np.exp(-(windspeed / c) ** k)
-
-        elif disttype.lower() == "pdf":
-            # Calculate probability of wind speed based on WeibulPDF
-            wind_prob = (
-                (k / c)
-                * (windspeed / c) ** (k - 1)
-                * np.exp(-(windspeed / c) ** k)
-            )
-
-        else:
-            raise ValueError(
-                f"The {disttype} probability distribution type is invalid"
-            )
-
-        return wind_prob
-
-    def AEP(self, stats, windspeeds, pwr_curve_vars):
-        """
-        Calculate AEP for simulation cases
-
-        Parameters:
         ----------
-        stats : pd.DataFrame
-            DataFrame containing summary statistics of each DLC.
-        windspeeds : list-like
-            List of wind speed values corresponding to each power output in the stats input
-            for a single dataset
-
-        Returns:
-        --------
-        AEP : list
-            List of annual energy productions.
+        windspeed : Numpy array
+            Numpy array of the average inflow wind speed for each output.
         """
 
-        assert len(stats) == len(windspeeds)
-
-        pwr = stats.loc[:, ("GenPwr", "mean")].to_frame()
-
-        # Group and average powers by wind speeds
-        pwr["windspeeds"] = windspeeds
-        pwr = pwr.groupby("windspeeds").mean()
-
-        # Wind probability
-        unique = list(np.unique(windspeeds))
-        wind_prob = self.prob_WindDist(unique, disttype="pdf")
-
-        # Calculate AEP
-        AEP = np.trapz(pwr.T * wind_prob, unique) * 8760
-
-        perf_data = {"U": unique}
-        for var in pwr_curve_vars:
-            try:
-                perf_array = stats.loc[:, (var, "mean")].to_frame()
-            except KeyError:
-                print(var,"not found. . . continuing")
-                continue
-            perf_array["windspeed"] = windspeeds
-            perf_array = perf_array.groupby("windspeed").mean()
-            perf_data[var] = perf_array[var]
-
-        return AEP, perf_data
+        if isinstance(windspeed, str):
+            # If user passed wind u-component channel name (e.g. 'Wind1VelX'),
+            # then get mean value for every case
+            mywindspeed = np.array( [np.mean( k[windspeed] ) for k in self.outputs] )
+        else:
+            # Assume user passed windspeeds directly
+            noutput = len(self.outputs)
+            mywindspeed = np.array(windspeed)
+            if mywindspeed.size != noutput:
+                raise ValueError(f"When giving list of windspeeds, must have {noutput} values, one for every case")
+            
+        return mywindspeed
 
     
+    def set_probability_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull"):
+        """
+        Sets the probability of each output in the list based on a Weibull or Rayleigh
+        distribution for windspeed.
+
+        Probability density function is sampled at each windspeed.  The resulting vector of
+        density values is then scaled such that they sum to one.
+
+        Parameters
+        ----------
+        windspeed : str or list / Numpy array
+            If input as a list or array, it is simply returned (after checking for correct length).
+            If input as a string, then it should be the channel name of the u-velocity component
+            ('Wind1VelX` in OpenFAST)
+        v_avg : float
+            Average velocity for the wind distribution (sets the scale parameter in the distribution)
+        weibull_k : float
+            Shape parameter for the Weibull distribution. Defaults to 2.0
+        kind : str
+            Which distribution to use.  Should be either 'weibull' or 'rayleigh'
+        """
+        
+        # Get windspeed from user or cases
+        mywindspeed = self._get_windspeeds(windspeed)
+
+        # Set probability from distributions
+        if kind.lower() == "weibull":
+            prob = weibull_mean(mywindspeed, weibull_k, v_avg, kind="pdf")
+            
+        elif kind.lower() in ["rayleigh", "rayliegh"]:
+            prob = rayleigh_mean(mywindspeed, v_avg, kind="pdf")
+
+        # Ensure probability sums to one for all of our cases
+        self.prob = prob / prob.sum()
+
+        
+    def set_probability_turbine_class(self, windspeed, turbine_class):
+        """
+        Sets the probability of each output in the list based on a Weibull distribution
+        (shape parameter 2) and average velocity as determined by IEC turbine class standards.
+
+        Parameters
+        ----------
+        windspeed : str or list / Numpy array
+            If input as a list or array, it is simply returned (after checking for correct length).
+            If input as a string, then it should be the channel name of the u-velocity component
+            ('Wind1VelX` in OpenFAST)
+        turbine_class : int or str
+            Turbine class either 1/'I' or 2/'II' or 3/'III'
+        """
+
+        # IEC average velocities
+        if turbine_class in [1, "I"]:
+            Vavg = 50 * 0.2
+
+        elif turbine_class in [2, "II"]:
+            Vavg = 42.5 * 0.2
+
+        elif turbine_class in [3, "III"]:
+            Vavg = 37.5 * 0.2
+
+        self.set_probability_distribution(windspeed, Vavg, weibull_k=2.0, kind="weibull")
+
+        
+    def compute_aep(self, pwrchan, loss_factor=1.0):
+        """
+        Computes annual energy production based on all outputs in the list.
+
+        Parameters
+        ----------
+        pwrchan : string
+            Name of channel containing output electrical power in the simulation
+            (e.g. 'GenPwr' in OpenFAST)
+        loss_factor : float
+            Multiplicative loss factor for availability and other losses
+            (soiling, array, etc.) to apply to AEP calculation (1.0 = no losses)"
+
+        Returns
+        ----------
+        aep_weighted : float
+            Weighted AEP where each output is weighted by the probability of
+            occurence determined from its average wind speed
+        aep_unweighted : float
+            Unweighted AEP that assumes all outputs in the list are equally
+            likely (just a mean)
+        """
+        
+        # Calculate scaling factor for year with losses included
+        fact = loss_factor * 365.0 * 24.0
+
+        # Power for every output case
+        P = np.array( [k.compute_power(pwrchan) for k in self.outputs] )
+
+        # Sum with probability
+        aep_weighted = fact * np.dot(P, self.prob)
+
+        # Assume equal probability
+        aep_unweighted = fact * P.mean()
+        
+        return aep_weighted, aep_unweighted
+
+    
+    def compute_total_fatigue(self):
+        """
+        Computes total damage equivalent load and total damage based on all
+        outputs in the list.
+
+        The `process_outputs` function shuld be run before this.
+
+        Returns
+        ----------
+        total_dels : Pandas DataFrame
+            Weighted and unweighted summations of damage equivalent loads for each fatigue channel
+        total_damage : Pandas DataFrame
+            Weighted and unweighted summations of damage for each fatigue channel
+        """
+        
+        if self.dels:
+            # These should come out as pandas Series
+            dels_weighted = np.sum(self.prob[:,np.newaxis] * self.dels, axis=0)
+            dels_unweighted = self.dels.mean()
+            damage_weighted = np.sum(self.prob[:,np.newaxis] * self.damage, axis=0)
+            damage_unweighted = self.damage.mean()
+            
+            # Combine in to DataFrames
+            dels_total = pd.DataFrame([dels_weighted, dels_unweighted],
+                                      index=['Weighted','Unweighted'])
+            damage_total = pd.DataFrame([damage_weighted, damage_unweighted],
+                                        index=['Weighted','Unweighted'])
+            return dels_total, damage_total
+        
+        else:
+            print("No DELs found.  Please run process_outputs first.")
+            return None, None

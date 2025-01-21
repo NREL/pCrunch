@@ -4,7 +4,7 @@ from fnmatch import fnmatch
 #import numpy as np
 import pandas as pd
 
-from pCrunch import LoadsAnalysis, PowerProduction, FatigueParams, read
+from pCrunch import Crunch, FatigueParams, read
 from pCrunch.utility import load_yaml, save_yaml, get_windspeeds, convert_summary_stats
 
 
@@ -48,40 +48,37 @@ if __name__ == '__main__':
 
     # Run pCrunch
     outputs = read(outfiles)
-    la = LoadsAnalysis(
-        outputs,
-        magnitude_channels=magnitude_channels,
-        fatigue_channels=fatigue_channels,
-        extreme_channels=channel_extremes,
-        trim_data=(0,),
-    )
-    la.process_outputs(cores=3, return_damage=True, goodman=True)
+    cruncher = Crunch(outputs,
+                      magnitude_channels=magnitude_channels,
+                      fatigue_channels=fatigue_channels,
+                      extreme_channels=channel_extremes,
+                      trim_data=(0,),
+                      )
+    cruncher.process_outputs(cores=3, return_damage=True, goodman=True)
 
     if save_results:
         save_yaml(
             results_dir,
             "summary_stats.yaml",
-            convert_summary_stats(la.summary_stats),
+            convert_summary_stats(cruncher.summary_stats),
         )
 
-    # Load case matrix into dataframe
-    fname_case_matrix = os.path.join(output_dir, "case_matrix_DLC1.1_0.yaml")
-    case_matrix = load_yaml(fname_case_matrix)
-    cm = pd.DataFrame(case_matrix)
-
-    # Get wind speeds for processed runs
-    windspeeds, seed, IECtype, cm_wind = get_windspeeds(cm, return_df=True)
-
-    # Get AEP
+    # Get AEP from average windspeeds in time history
     turbine_class = 1
-    pp = PowerProduction(turbine_class)
-    AEP, perf_data = pp.AEP(
-        la.summary_stats,
-        windspeeds,
-        ["GenPwr", "RtAeroCp", "RotSpeed", "BldPitch1"],
-    )
-    print(f"AEP: {AEP}")
+    windchan = "Wind1VelX"
+    pwrchan = "GenPwr"
+    loss_factor = 1.0 - 0.15 # Assume 15% loss for soil, farm effects, downtime
+    cruncher.set_probability_turbine_class(windchan, turbine_class)
+    AEP1, _ = cruncher.compute_aep(pwrchan, loss_factor)
 
+    # Get AEP from case matrix file
+    fname_case_matrix = os.path.join(output_dir, "case_matrix_DLC1.1_0.yaml")
+    cm = pd.DataFrame( load_yaml(fname_case_matrix) )
+    windspeeds, _, _, _ = get_windspeeds(cm, return_df=True)
+    cruncher.set_probability_turbine_class(windspeeds, turbine_class)
+    AEP2, _ = cruncher.compute_aep(pwrchan, loss_factor)
+
+    print(f"AEP: {AEP1} vs {AEP2}")
     # # ========== Plotting ==========
     # an_plts = Analysis.wsPlotting()
     # #  --- Time domain analysis ---

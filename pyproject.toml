@@ -48,7 +48,7 @@ classifiers = [  # Optional
   "Operating System :: MacOS",
 ]
 
-dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy"]
+dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy", "numexpr"]
 
 # List additional groups of dependencies here (e.g. development
 # dependencies). Users will be able to install these using the "extras"

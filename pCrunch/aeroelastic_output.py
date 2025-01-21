@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from scipy import stats, signal
-
+import numexpr as ne
 
 def dataproperty(f):
     @property
@@ -24,7 +24,6 @@ class AeroelasticOutput:
         self.description = ""
         self.units       = None
         self.filepath    = ""
-        self.magnitude_channels = None
 
         for k in ["dlc", "DLC", "name", "Name", "NAME", "filename","filepath","file"]:
             self.filepath = kwargs.get(k, "")
@@ -67,8 +66,63 @@ class AeroelasticOutput:
 
         else:
             pass
+            #print("Unknown data type.  Expected dict or list or DataFrame or Numpy Array")
+            #print(f"Instead found, {type(datain)}")
         
-    
+
+    def _add_channel(self, datain, namein):
+        """
+        Add new channels of data.  ASSUMES NUMPY ARRAY
+        """
+        if namein in self.channels:
+            print(f"Channel '{namein}' already exists.")
+        else:
+            self.data = np.append(self.data, datain, axis=1)
+            self.channels = np.append(self.channels, namein)
+        
+    def add_channel(self, datain, namein=None):
+        """
+        Add new channels of data.
+
+        Parameters
+        ----------
+        magnitude_channels : dict
+            Format: 'new-chan' ['chan1', 'chan2', 'chan3'],
+        """
+        if isinstance(datain, dict):
+            for c in datain.keys():
+                self._add_channel(np.array(datain[c]), c.strip())
+            
+        elif isinstance(datain, list) and isinstance(namein, list):
+            for k in range(len(namein)):
+                self._add_channel(np.array(datain[k]), namein[k].strip())
+            
+        elif isinstance(datain, list) and isinstance(namein, str):
+            self._add_channel(np.array(datain), namein.strip())
+            
+        elif isinstance(datain, pd.DataFrame):
+            for c in list(datain.columns):
+                self._add_channel(datain[c].to_numpy(), c.strip())
+
+        elif isinstance(datain, np.ndarray) and isinstance(namein, np.ndarray):
+            for k in range(len(namein)):
+                self._add_channel(datain[:,k], namein[k].strip())
+                
+        elif isinstance(datain, np.ndarray) and isinstance(namein, str):
+            self._add_channel(datain, namein.strip())
+
+        else:
+            print("Unknown data type.  Expected dict or list or DataFrame or Numpy Array")
+            print(f"Instead found, {type(datain)}")
+
+    def calculate_channel(self, instr, namein):
+        """
+        Add channel based on string expression
+        """
+        new_data = ne.evaluate(instr, local_dict=self.to_dict())
+        self._add_channel(new_data, namein.strip())
+
+            
     def trim_data(self, tmin=0, tmax=np.inf):
         """
         Trims `self.data` to the data between `tmin` and `tmax`.
@@ -81,13 +135,13 @@ class AeroelasticOutput:
             Ending time.
         """
 
-        idx = np.where((self.time >= tmin) & (self.time <= tmax))
+        idx = np.where((self.time >= tmin) & (self.time <= tmax))[0]
         if tmin > max(self.time):
             raise ValueError(
                 f"Initial time '{tmin}' is after the end of the simulation."
             )
 
-        self.data = self.data[idx]
+        self.data = self.data[idx,:]
 
     @dataproperty
     def time(self):
@@ -115,29 +169,55 @@ class AeroelasticOutput:
             Format: 'new-chan' ['chan1', 'chan2', 'chan3'],
         """
 
-        if magnitude_channels is not None:
+        if magnitude_channels is None:
+            return
+        else:
             if not isinstance(magnitude_channels, dict):
                 raise ValueError("Expecting magnitude channels as a dictionary, 'new-chan': ['chan1', 'chan2', 'chan3']")
-            
-            if self.magnitude_channels is None:
-                self.magnitude_channels = magnitude_channels
-            else:
-                self.magnitude_channels.update(magnitude_channels)
         
-        for new_chan, chans in self.magnitude_channels.items():
+        for new_chan, chans in magnitude_channels.items():
 
-            if new_chan in self.channels:
-                print(f"Channel '{new_chan}' already exists.")
-                continue
             try:
                 arrays = np.array([self[a] for a in chans]).T
                 normed = np.linalg.norm(arrays, axis=1).reshape(arrays.shape[0], 1)
             except:
                 normed = np.nan * np.ones((self.data.shape[0],1))
 
-            self.data = np.append(self.data, normed, axis=1)
-            self.channels = np.append(self.channels, new_chan)
+            self._add_channel(normed, new_chan)
+            
+    def add_magnitude_channels(self, magnitude_channels=None):
+        """
+        Since add/append get confused quite a bit
+        """
+        self.append_magnitude_channels(magnitude_channels=magnitude_channels)
 
+    def add_load_rose(self, load_rose=None, nsec=6):
+        """
+        Append a load rose of `nsec` sectors of x-y `channels` to the dataset.
+        The x-channel will be multiplied by cos(theta) and y-channel by sin(theta)
+
+        Parameters
+        ----------
+        load_rose : dict
+            Format: 'new-chan' ['chan_x', 'chan_y'],
+        """
+
+        if load_rose is None:
+            return
+        else:
+            if not isinstance(load_rose, dict):
+                raise ValueError("Expecting load rose channels as a dictionary, 'new-chan': ['chan_x', 'chan_y']")
+
+        thd = np.linspace(0, 360, nsec+1)
+        
+        for rootstr, chans in load_rose.items():
+            for td in thd:
+                tr = np.deg2rad(td)
+                new_chan = rootstr + str(int(td))
+                new_data = self[chans[0]]*np.cos(tr) + self[chans[1]]*np.sin(tr)
+                self._add_channel(new_data, new_chan)
+                print(f"Added channel, {new_chan}")
+                
     @property
     def headers(self):
         if getattr(self, "units", None) is None:
@@ -283,16 +363,19 @@ class AeroelasticOutput:
     def integrated(self):
         return np.trapz(self.data, self.time, axis=0)
 
+    def compute_power(self, pwrchan):
+        return np.trapz(self[pwrchan], self.time)
+    
     @dataproperty
     def psd(self):
         fs = 1. / np.diff(self.time)[0]
         freq, Pxx_den = signal.welch(self.data, fs, axis=0)
         return freq, Pxx_den
 
-    
     def time_averaging(self, time_window):
         """
-        Applies averaging window on time-domain loads channels.  Window input is seconds
+        Applies averaging/smoothing window on time-domain channels via convolution.
+        Window input is seconds
         """
         dt = np.diff(self.time)[0]
         npts = int(time_window / dt)
@@ -306,7 +389,7 @@ class AeroelasticOutput:
         return type(self)(data_avg, self.channels)
 
     
-    def time_binning(self,time_window):
+    def time_binning(self, time_window):
         """
         Bin the data into groups specified by time_window (in seconds)
         Average (or, someday, other stats of those windows)
