@@ -161,35 +161,24 @@ class Crunch:
             Should be a list or tuple or array of floats the same length as the `outputs` list
         """
 
-        self.outputs = outputs
-        self.parse_settings(**kwargs)
+        if isinstance(outputs, list):
+            self.outputs = outputs
+        else:
+            self.outputs = [outputs]
+
+        td = kwargs.get("trim_data", ())
+        self.trim_data(*td)
+
+        mc = kwargs.get("magnitude_channels", {})
+        self.append_magnitude_channels(mc)
         
-
-    def parse_settings(self, **kwargs):
-        """Parses settings from input kwargs."""
-
-        self.directory = kwargs.get("directory", None)
         self.ec = kwargs.get("extreme_channels", True)
-        self.mc = kwargs.get("magnitude_channels", {})
         self.fc = kwargs.get("fatigue_channels", {})
-        self.td = kwargs.get("trim_data", ())
+        
         self.prob = kwargs.get("probability", [])
-
-        self.prep_outputs()
-
-    def prep_outputs(self):
-        """Trim the data by time, set magnitude channels and probability."""
-
-        for k in self.outputs:
-            if len(self.td) > 0:
-                k.trim_data(*self.td)
-
-            if len(self.mc) > 0:
-                k.append_magnitude_channels( self.mc )
-
-            if len(self.prob) == 0:
-                noutput = len(self.outputs)
-                self.prob = np.ones( noutput ) / float(noutput)
+        if len(self.prob) == 0:
+            noutput = len(self.outputs)
+            self.prob = np.ones( noutput ) / float(noutput)
             
         
         
@@ -494,17 +483,20 @@ class Crunch:
             likely (just a mean)
         """
         
-        # Calculate scaling factor for year with losses included
-        fact = loss_factor * 365.0 * 24.0
+        # Energy for every output case
+        E = np.array( self.compute_energy(pwrchan) )
 
-        # Power for every output case
-        P = np.array( [k.compute_power(pwrchan) for k in self.outputs] )
+        # Elapsed time over the simulations
+        T = np.array( self.elapsed_time() )
+
+        # Calculate scaling factor for year with losses included
+        fact = loss_factor * 365.0 * 24.0 * 60.0 * 60.0 / T.sum()
 
         # Sum with probability
-        aep_weighted = fact * np.dot(P, self.prob)
+        aep_weighted = fact * np.dot(E, self.prob)
 
         # Assume equal probability
-        aep_unweighted = fact * P.mean()
+        aep_unweighted = fact * E.mean()
         
         return aep_weighted, aep_unweighted
 
@@ -541,3 +533,81 @@ class Crunch:
         else:
             print("No DELs found.  Please run process_outputs first.")
             return None, None
+
+        
+    # Batch versions of AeroelasticOutput methods
+    def calculate_channel(self, instr, namein):
+        for k in self.outputs:
+            k.calculate_channel(instr, namein)
+    def trim_data(self, tmin=0, tmax=np.inf):
+        for k in self.outputs:
+            k.trim_data(tmin, tmax)
+    def append_magnitude_channels(self, magnitude_channels=None):
+        for k in self.outputs:
+            k.append_magnitude_channels(magnitude_channels)
+    def add_magnitude_channels(self, magnitude_channels=None):
+        self.append_magnitude_channels(magnitude_channels)
+    def add_load_rose(self, load_rose=None, nsec=6):
+        for k in self.outputs:
+            k.add_load_rose(load_rose=load_rose, nsec=nsec)
+    def extremes(self, channels=None):
+        return [m.extremes(channels) for m in self.outputs]
+    def num_timesteps(self):
+        return [m.num_timesteps for m in self.outputs]
+    def num_channels(self):
+        return [m.num_channels for m in self.outputs]
+    def elapsed_time(self):
+        return [m.elapsed_time for m in self.outputs]
+    def idxmins(self):
+        return [m.idxmins for m in self.outputs]
+    def idxmaxs(self):
+        return [m.idxmaxs for m in self.outputs]
+    def minima(self):
+        return [m.minima for m in self.outputs]
+    def maxima(self):
+        return [m.maxima for m in self.outputs]
+    def ranges(self):
+        return [m.ranges for m in self.outputs]
+    def variable(self):
+        return [m.variable for m in self.outputs]
+    def constant(self):
+        return [m.constant for m in self.outputs]
+    def sums(self):
+        return [m.sums for m in self.outputs]
+    def sums_squared(self):
+        return [m.sums_squared for m in self.outputs]
+    def sums_cubed(self):
+        return [m.sums_cubed for m in self.outputs]
+    def sums_fourth(self):
+        return [m.sums_fourth for m in self.outputs]
+    def second_moments(self):
+        return [m.second_moments for m in self.outputs]
+    def third_moments(self):
+        return [m.third_moments for m in self.outputs]
+    def fourth_moments(self):
+        return [m.fourth_moments for m in self.outputs]
+    def means(self):
+        return [m.means for m in self.outputs]
+    def medians(self):
+        return [m.medians for m in self.outputs]
+    def absmaxima(self):
+        return [m.absmaxima for m in self.outputs]
+    def stddevs(self):
+        return [m.stddevs for m in self.outputs]
+    def skews(self):
+        return [m.skews for m in self.outputs]
+    def kurtosis(self):
+        return [m.kurtosis for m in self.outputs]
+    def integrated(self):
+        return [m.integrated for m in self.outputs]
+    def compute_energy(self, pwrchan):
+        return [m.compute_energy(pwrchan) for m in self.outputs]
+    def time_averaging(self, time_window):
+        return [m.time_averaging(time_window) for m in self.outputs]
+    def time_binning(self, time_window):
+        return [m.time_binning(time_window) for m in self.outputs]
+    def get_summary_stats(self):
+        return [m.get_summary_stats() for m in self.outputs]
+    def psd(self):
+        return [m.psd() for m in self.outputs]
+

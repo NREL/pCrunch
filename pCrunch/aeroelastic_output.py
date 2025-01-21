@@ -122,6 +122,22 @@ class AeroelasticOutput:
         new_data = ne.evaluate(instr, local_dict=self.to_dict())
         self._add_channel(new_data, namein.strip())
 
+    def to_df(self):
+        """Returns `self.data` as a DataFrame."""
+
+        if self.channels is None:
+            return pd.DataFrame(self.data)
+        else:
+            return pd.DataFrame(self.data, columns=self.channels)
+
+    @dataproperty
+    def df(self):
+        return self.to_df()
+        
+    def to_dict(self):
+        """Returns `self.data` as a dictionary."""
+
+        return {self.channels[k]:self.data[:,k] for k in range(len(self.channels))}
             
     def trim_data(self, tmin=0, tmax=np.inf):
         """
@@ -249,23 +265,6 @@ class AeroelasticOutput:
             }
 
         return extremes
-
-    def to_df(self):
-        """Returns `self.data` as a DataFrame."""
-
-        if self.channels is None:
-            return pd.DataFrame(self.data)
-        else:
-            return pd.DataFrame(self.data, columns=self.channels)
-
-    @dataproperty
-    def df(self):
-        return self.to_df()
-        
-    def to_dict(self):
-        """Returns `self.data` as a dictionary."""
-
-        return {self.channels[k]:self.data[:,k] for k in range(len(self.channels))}
         
     @dataproperty
     def num_timesteps(self):
@@ -363,11 +362,20 @@ class AeroelasticOutput:
     def integrated(self):
         return np.trapz(self.data, self.time, axis=0)
 
-    def compute_power(self, pwrchan):
+    def compute_energy(self, pwrchan):
         return np.trapz(self[pwrchan], self.time)
     
-    @dataproperty
     def psd(self):
+        """
+        Compute power spectra density for each channel.
+
+        Returns
+        ----------
+        freq : Numpy array 1-D
+            Valid frequencies for spectra
+        Pxx_den : Numpy array 2-D
+            Power spectral density with each column corresponding to a channel
+        """
         fs = 1. / np.diff(self.time)[0]
         freq, Pxx_den = signal.welch(self.data, fs, axis=0)
         return freq, Pxx_den
@@ -376,6 +384,16 @@ class AeroelasticOutput:
         """
         Applies averaging/smoothing window on time-domain channels via convolution.
         Window input is seconds
+        
+        Parameters
+        ----------
+        time_windows : float
+            Window for averaging/smoothing in seconds
+
+        Returns
+        ----------
+        obj : AeroelasticOutput object
+            New AeroelasticOutput instance with the new data
         """
         dt = np.diff(self.time)[0]
         npts = int(time_window / dt)
@@ -393,6 +411,16 @@ class AeroelasticOutput:
         """
         Bin the data into groups specified by time_window (in seconds)
         Average (or, someday, other stats of those windows)
+        
+        Parameters
+        ----------
+        time_windows : float
+            Window for averaging/smoothing in seconds
+
+        Returns
+        ----------
+        obj : AeroelasticOutput object
+            New AeroelasticOutput instance with the new data
         """
 
         n_bins = int(np.ceil((self.time.max() - self.time.min()) / time_window))
