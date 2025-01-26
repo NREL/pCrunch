@@ -48,7 +48,7 @@ if __name__ == '__main__':
 
     # Run pCrunch
     outputs = read(outfiles)
-    cruncher = Crunch(outputs,
+    cruncher = Crunch(outputs=outputs,
                       magnitude_channels=magnitude_channels,
                       fatigue_channels=fatigue_channels,
                       extreme_channels=channel_extremes,

@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats, signal
 import numexpr as ne
+import fatpack
 
 def dataproperty(f):
     @property
@@ -75,7 +76,8 @@ class AeroelasticOutput:
         Add new channels of data.  ASSUMES NUMPY ARRAY
         """
         if namein in self.channels:
-            print(f"Channel '{namein}' already exists.")
+            pass
+            #print(f"Channel '{namein}' already exists.")
         else:
             self.data = np.append(self.data, datain, axis=1)
             self.channels = np.append(self.channels, namein)
@@ -246,25 +248,6 @@ class AeroelasticOutput:
                 else f"{self.channels[k]} [{self.units[k]}]"
                 for k in range(self.num_channels)
             ]
-
-    def extremes(self, channels=None):
-        """"""
-        if channels is None:
-            channels = list(self.channels)
-            
-        sorter = np.argsort(self.channels)
-        exists = [c for c in channels if c in self.channels]
-        idx = sorter[np.searchsorted(self.channels, exists, sorter=sorter)]
-
-        extremes = {}
-        for chan, i in zip(exists, idx):
-            idx_max = self.idxmaxs[i]
-            extremes[chan] = {
-                "Time": self.time[idx_max],
-                **dict(zip(exists, self.data[idx_max, idx])),
-            }
-
-        return extremes
         
     @dataproperty
     def num_timesteps(self):
@@ -457,9 +440,6 @@ class AeroelasticOutput:
         for k in range(len(self.channels)):
             channel = self.channels[k]
             
-            if channel in ["time", "Time"]:
-                continue
-
             fstats[channel] = {
                 "min": mins[k],
                 "max": maxs[k],
@@ -471,3 +451,107 @@ class AeroelasticOutput:
             }
 
         return fstats
+
+    
+    def extremes(self, channels=None):
+        """"""
+        if channels is None:
+            channels = list(self.channels)
+            
+        sorter = np.argsort(self.channels)
+        exists = [c for c in channels if c in self.channels]
+        idx = sorter[np.searchsorted(self.channels, exists, sorter=sorter)]
+
+        extremes = {}
+        for chan, i in zip(exists, idx):
+            idx_max = self.idxmaxs[i]
+            extremes[chan] = {
+                "Time": self.time[idx_max],
+                **dict(zip(exists, self.data[idx_max, idx])),
+            }
+
+        return extremes
+
+
+    def compute_del(self, ts, lifetime, load2stress, slope, Sult, Sc=0.0, **kwargs):
+        """
+        Computes damage equivalent load of input `ts`.
+
+        Parameters
+        ----------
+        ts : str or np.array
+            Channel name or time series to calculate DEL for.
+        elapsed : int | float
+            Elapsed time of the time series.
+        lifetime : int | float
+            Design lifetime of the component / material in years
+        load2stress : float (optional)
+            Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
+        slope : int | float
+            Slope of the fatigue curve.
+        Sult : float (optional)
+            Ultimate stress for use in Goodman equivalent stress calculation
+        Sc : float (optional)
+            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
+        rainflow_bins : int
+            Number of bins used in rainflow analysis.
+            Default: 100
+        goodman_correction: boolean
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        return_damage: boolean
+            Whether to compute both DEL and damage
+            Default: False
+        """
+
+        bins = kwargs.get("rainflow_bins", 100)
+        return_damage = kwargs.get("return_damage", False)
+        goodman = kwargs.get("goodman_correction", False)
+        Scin = Sc if Sc > 0.0 else Sult
+        elapsed = self.elapsed_time
+        if isinstance(ts, str):
+            ts = self[ts]
+
+        # Default return values
+        DEL = np.nan
+        D   = np.nan
+
+        if np.all(np.isnan(ts)):
+            return DEL, D
+
+        # Working with loads for DELs
+        try:
+            F, Fmean = fatpack.find_rainflow_ranges(ts, return_means=True)
+        except Exception:
+            F = Fmean = np.zeros(1)
+        if goodman and np.abs(load2stress) > 0.0:
+            F = fatpack.find_goodman_equivalent_stress(F, Fmean, Sult/np.abs(load2stress))
+        Nrf, Frf = fatpack.find_range_count(F, bins)
+        DELs = Frf ** slope * Nrf / elapsed
+        DEL = DELs.sum() ** (1.0 / slope)
+        # With fatpack do:
+        #curve = fatpack.LinearEnduranceCurve(1.)
+        #curve.m = slope
+        #curve.Nc = elapsed
+        #DEL = curve.find_miner_sum(np.c_[Frf, Nrf]) ** (1 / slope)
+
+        # Compute Palmgren/Miner damage using stress
+        D = np.nan # default return value
+        if return_damage and np.abs(load2stress) > 0.0:
+            try:
+                S, Mrf = fatpack.find_rainflow_ranges(ts*load2stress, return_means=True)
+            except Exception:
+                S = Mrf = np.zeros(1)
+            if goodman:
+                S = fatpack.find_goodman_equivalent_stress(S, Mrf, Sult)
+            Nrf, Srf = fatpack.find_range_count(S, bins)
+            curve = fatpack.LinearEnduranceCurve(Scin)
+            curve.m = slope
+            curve.Nc = 1
+            D = curve.find_miner_sum(np.c_[Srf, Nrf])
+            if lifetime > 0.0:
+                D *= lifetime*365.0*24.0*60.0*60.0 / elapsed
+
+        return DEL, D
+
+

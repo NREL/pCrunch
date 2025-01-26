@@ -2,151 +2,22 @@ import multiprocessing as mp
 from functools import partial
 import numpy as np
 import pandas as pd
-import fatpack
 from .utility import weibull_mean, rayleigh_mean
-
-def compute_del(ts, elapsed, lifetime, load2stress, slope, Sult, Sc=0.0, **kwargs):
-    """
-    Computes damage equivalent load of input `ts`.
-
-    Parameters
-    ----------
-    ts : np.array
-        Time series to calculate DEL for.
-    elapsed : int | float
-        Elapsed time of the time series.
-    lifetime : int | float
-        Design lifetime of the component / material in years
-    load2stress : float (optional)
-        Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
-    slope : int | float
-        Slope of the fatigue curve.
-    Sult : float (optional)
-        Ultimate stress for use in Goodman equivalent stress calculation
-    Sc : float (optional)
-        Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
-    rainflow_bins : int
-        Number of bins used in rainflow analysis.
-        Default: 100
-    goodman_correction: boolean
-        Whether to apply Goodman mean correction to loads and stress
-        Default: False
-    return_damage: boolean
-        Whether to compute both DEL and damage
-        Default: False
-    """
-
-    bins = kwargs.get("rainflow_bins", 100)
-    return_damage = kwargs.get("return_damage", False)
-    goodman = kwargs.get("goodman_correction", False)
-    Scin = Sc if Sc > 0.0 else Sult
-
-    # Default return values
-    DEL = np.nan
-    D   = np.nan
-
-    if np.all(np.isnan(ts)):
-        return DEL, D
-
-    # Working with loads for DELs
-    try:
-        F, Fmean = fatpack.find_rainflow_ranges(ts, return_means=True)
-    except Exception:
-        F = Fmean = np.zeros(1)
-    if goodman and np.abs(load2stress) > 0.0:
-        F = fatpack.find_goodman_equivalent_stress(F, Fmean, Sult/np.abs(load2stress))
-    Nrf, Frf = fatpack.find_range_count(F, bins)
-    DELs = Frf ** slope * Nrf / elapsed
-    DEL = DELs.sum() ** (1.0 / slope)
-    # With fatpack do:
-    #curve = fatpack.LinearEnduranceCurve(1.)
-    #curve.m = slope
-    #curve.Nc = elapsed
-    #DEL = curve.find_miner_sum(np.c_[Frf, Nrf]) ** (1 / slope)
-
-    # Compute Palmgren/Miner damage using stress
-    D = np.nan # default return value
-    if return_damage and np.abs(load2stress) > 0.0:
-        try:
-            S, Mrf = fatpack.find_rainflow_ranges(ts*load2stress, return_means=True)
-        except Exception:
-            S = Mrf = np.zeros(1)
-        if goodman:
-            S = fatpack.find_goodman_equivalent_stress(S, Mrf, Sult)
-        Nrf, Srf = fatpack.find_range_count(S, bins)
-        curve = fatpack.LinearEnduranceCurve(Scin)
-        curve.m = slope
-        curve.Nc = 1
-        D = curve.find_miner_sum(np.c_[Srf, Nrf])
-        if lifetime > 0.0:
-            D *= lifetime*365.0*24.0*60.0*60.0 / elapsed
-
-    return DEL, D
-
-    
-# Could use a dict or namedtuple here, but this standardizes things a bit better for users
-class FatigueParams:
-    """Simple data structure of parameters needed by fatigue calculation."""
-
-    def __init__(self, **kwargs):
-        """
-        Creates an instance of `FatigueParams`.
-
-        Parameters
-        ----------
-        lifetime :  float (optional)
-            Design lifetime of the component / material in years
-        load2stress : float (optional)
-            Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
-        slope : float (optional)
-            Wohler exponent in the traditional SN-curve of S = A * N ^ -(1/m)
-        ult_stress : float (optional)
-            Ultimate stress for use in Goodman equivalent stress calculation
-        S_intercept : float (optional)
-            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
-        rainflow_bins : int
-            Number of bins used in rainflow analysis.
-            Default: 100
-        goodman_correction: boolean
-            Whether to apply Goodman mean correction to loads and stress
-            Default: False
-        return_damage: boolean
-            Whether to compute both DEL and damage
-            Default: False
-        """
-
-        self.lifetime      = kwargs.get("lifetime", 0.0)
-        self.load2stress   = kwargs.get("load2stress", 1.0)
-        self.slope         = kwargs.get("slope", 4.0)
-        self.ult_stress    = kwargs.get("ult_stress", 1.0)
-        temp               = kwargs.get("S_intercept", 0.0)
-        self.S_intercept   = temp if temp > 0.0 else self.ult_stress
-        self.bins          = kwargs.get("rainflow_bins", 100)
-        self.return_damage = kwargs.get("return_damage", False)
-        self.goodman       = kwargs.get("goodman_correction", False)
-
-    def copy(self):
-        return FatigueParams(lifetime=self.lifetime,
-                             load2stress=self.load2stress, slope=self.slope,
-                             ult_stress=self.ult_stress, S_intercept=self.S_intercept,
-                             bins=self.bins, return_damage=self.return_damage,
-                             goodman=self.goodman)
 
     
 class Crunch:
     """Implementation of `mlife` in python."""
 
-    def __init__(self, outputs, **kwargs):
+    def __init__(self, **kwargs):
         """
         Creates an instance of `pyLife`.
 
         Parameters
         ----------
-        outputs : list
+        outputs : list (optional)
             List of OpenFAST output filepaths or dicts of OpenFAST outputs.
-        directory : str (optional)
-            If directory is passed, list of files will be treated as relative
-            and appended to the directory.
+        lean : boolean (optional)
+            If False (default), the outputs are kept in memory as they are processed.  If True, only summary statistics are retained.
         fatigue_channels : dict (optional)
             Dictionary with format:
             'channel': 'fatigue slope'
@@ -161,26 +32,33 @@ class Crunch:
             Should be a list or tuple or array of floats the same length as the `outputs` list
         """
 
+        self.lean_flag = kwargs.get("lean", False)
+        
+        outputs = kwargs.get("outputs", [])
         if isinstance(outputs, list):
             self.outputs = outputs
         else:
             self.outputs = [outputs]
+        self.noutputs = len(self.outputs)
 
-        td = kwargs.get("trim_data", ())
-        self.trim_data(*td)
+        self.td = kwargs.get("trim_data", ())
+        self.trim_data(*self.td)
 
-        mc = kwargs.get("magnitude_channels", {})
-        self.append_magnitude_channels(mc)
+        self.mc = kwargs.get("magnitude_channels", {})
+        self.append_magnitude_channels(self.mc)
         
         self.ec = kwargs.get("extreme_channels", True)
         self.fc = kwargs.get("fatigue_channels", {})
         
-        self.prob = kwargs.get("probability", [])
-        if len(self.prob) == 0:
-            noutput = len(self.outputs)
-            self.prob = np.ones( noutput ) / float(noutput)
-            
+        self.prob = kwargs.get("probability", np.array([]))
+        if self.prob.size == 0:
+            self._reset_probabilities()
         
+        # Initialize containers
+        self.summary_stats = pd.DataFrame()
+        self.extremes = {}
+        self.dels = pd.DataFrame()
+        self.damage = pd.DataFrame()
         
     def process_outputs(self, cores=1, **kwargs):
         """
@@ -212,16 +90,24 @@ class Crunch:
             
         self.summary_stats, self.extremes, self.dels, self.damage = self.post_process(stats, extrs, dels, damage)
         
+        if self.lean_flag:
+            self.outputs = []
+        
 
     def process_single(self, output, **kwargs):
         """
-        Process OpenFAST output `f`.
+        Process AeroelasticOutput output `f`.
 
         Parameters
         ----------
-        f : str | OpenFASTOutput
+        f : str | AerolelasticOutput
             Path to output or direct output in dict format.
         """
+
+        # Data manipulation list all other outputs
+        output.trim_data(*self.td)
+        output.append_magnitude_channels(self.mc)
+        
         stats = output.get_summary_stats()
 
         if self.ec is True:
@@ -234,7 +120,49 @@ class Crunch:
 
         return output.filename, stats, extremes, dels, damage
 
-    
+
+    def add_output(self, output, **kwargs):
+        """
+        Appends output to the list and processes it
+
+        Parameters
+        ----------
+        output : AerolelasticOutput
+        """
+        
+        # Data manipulation list all other outputs
+        output.trim_data(*self.td)
+        output.append_magnitude_channels(self.mc)
+        
+        # Add the output to our lists and increment counters
+        if not self.lean_flag:
+            self.outputs.append(output)
+
+        # Analyze the data
+        fname, stats, extremes, dels, damage =  self.process_single(output, **kwargs)
+
+        # Add to output stat containers
+        self.dd_output_stats(fname, stats, extremes, dels, damage)
+
+        
+    def add_output_stats(self, fname, stats, extremes, dels, damage):
+
+        # Append to the stats logs
+        summary_stats = self._process_summary_stats( {fname:stats} )
+        self.summary_stats = pd.concat((self.summary_stats, summary_stats), axis=0)
+
+        # Extreme events- join dictionaries
+        self.extremes = self._process_extremes( {'null':self.extremes, fname:extremes} )
+        
+        # Damage and Damage Equivalent Loads
+        self.dels   = pd.concat((self.dels,   pd.DataFrame(dels, index=[fname])), axis=0)
+        self.damage = pd.concat((self.damage, pd.DataFrame(damage, index=[fname])), axis=0)
+
+        # Increment counters
+        self.noutputs += 1
+        self._reset_probabilities()
+
+        
     def get_DELs(self, output, **kwargs):
         """
         Appends computed damage equivalent loads for fatigue channels in
@@ -242,7 +170,7 @@ class Crunch:
 
         Parameters
         ----------
-        output : OpenFASTOutput
+        output : AerolelasticOutput
         rainflow_bins : int
             Number of bins used in rainflow analysis.
             Default: 100
@@ -275,9 +203,8 @@ class Crunch:
                 
             try:
 
-                DELs[chan], D[chan] = compute_del(
-                    output[chan], output.elapsed_time,
-                    fatparams.lifetime,
+                DELs[chan], D[chan] = output.compute_del(
+                    chan, fatparams.lifetime,
                     fatparams.load2stress, fatparams.slope,
                     fatparams.ult_stress, fatparams.S_intercept,
                     goodman_correction=goodman, rainflow_bins=bins,
@@ -292,25 +219,31 @@ class Crunch:
         return DELs, D
 
 
-    @staticmethod
-    def post_process(statsin, extremesin, delsin, damagein):
-        """Post processes internal data to produce DataFrame outputs."""
-
+    def _process_summary_stats(self, statsin):
         # Summary statistics
         ss = pd.DataFrame.from_dict(statsin, orient="index").stack().to_frame()
         ss = pd.DataFrame(ss[0].values.tolist(), index=ss.index)
-        summary_stats = ss.unstack().swaplevel(axis=1)
+        return ss.unstack().swaplevel(axis=1)
 
-        # Extreme events
+    def _process_extremes(self, extremesin):
+        # Extremes
         extreme_table = {}
         for _, d in extremesin.items():
             for channel, sub in d.items():
-                if channel not in extreme_table.keys():
-                    extreme_table[channel] = []
+                subt = sub if isinstance(sub, list) else [sub]
+                if channel not in extreme_table:
+                    extreme_table[channel] = subt
+                else:
+                    extreme_table[channel] += subt
+        return extreme_table
+        
+    def post_process(self, statsin, extremesin, delsin, damagein):
+        """Post processes internal data to produce DataFrame outputs."""
+        summary_stats = self._process_summary_stats(statsin)
 
-                extreme_table[channel].append(sub)
-        extremes = extreme_table
-
+        # Extreme events
+        extremes = self._process_extremes(extremesin)
+        
         # Damage and Damage Equivalent Loads
         dels = pd.DataFrame(delsin).T
         damage = pd.DataFrame(damagein).T
@@ -365,7 +298,7 @@ class Crunch:
         return pd.DataFrame(out, columns=["file", "channel", "stat", "val"])
 
 
-    def _get_windspeeds(self, windspeed):
+    def _get_windspeeds(self, windspeed, idx=None):
         """
         Returns the wind speeds in the output list if not already known.
 
@@ -375,7 +308,9 @@ class Crunch:
             If input as a list or array, it is simply returned (after checking for correct length).
             If input as a string, then it should be the channel name of the u-velocity component
             ('Wind1VelX` in OpenFAST)
-
+        idx: list or Numpy array (default None)
+            Index vector into output case list
+        
         Returns
         ----------
         windspeed : Numpy array
@@ -386,17 +321,26 @@ class Crunch:
             # If user passed wind u-component channel name (e.g. 'Wind1VelX'),
             # then get mean value for every case
             mywindspeed = np.array( [np.mean( k[windspeed] ) for k in self.outputs] )
+            if idx is not None and len(idx) > 0:
+                mywindspeed = mywindspeed[idx]
         else:
             # Assume user passed windspeeds directly
-            noutput = len(self.outputs)
             mywindspeed = np.array(windspeed)
-            if mywindspeed.size != noutput:
-                raise ValueError(f"When giving list of windspeeds, must have {noutput} values, one for every case")
+            if idx is not None and len(idx) > 0:
+                ntarget = len(idx)
+            else:
+                ntarget = self.noutputs
+            if mywindspeed.size != ntarget:
+                raise ValueError(f"When giving list of windspeeds, must have {ntarget} values, one for every case")
             
         return mywindspeed
 
     
-    def set_probability_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull"):
+    def _reset_probabilities(self):
+        if self.noutputs > 0:
+            self.prob = np.ones( self.noutputs ) / float(self.noutputs)
+            
+    def set_probability_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull", idx=None):
         """
         Sets the probability of each output in the list based on a Weibull or Rayleigh
         distribution for windspeed.
@@ -416,10 +360,12 @@ class Crunch:
             Shape parameter for the Weibull distribution. Defaults to 2.0
         kind : str
             Which distribution to use.  Should be either 'weibull' or 'rayleigh'
+        idx: list or Numpy array (default None)
+            Index vector into output case list
         """
         
         # Get windspeed from user or cases
-        mywindspeed = self._get_windspeeds(windspeed)
+        mywindspeed = self._get_windspeeds(windspeed, idx=idx)
 
         # Set probability from distributions
         if kind.lower() == "weibull":
@@ -429,10 +375,15 @@ class Crunch:
             prob = rayleigh_mean(mywindspeed, v_avg, kind="pdf")
 
         # Ensure probability sums to one for all of our cases
-        self.prob = prob / prob.sum()
+        self._reset_probabilities()
+        prob = prob / prob.sum()
+        if idx is not None and len(idx) > 0:
+            self.prob[idx] = prob
+        else:
+            self.prob = prob
 
         
-    def set_probability_turbine_class(self, windspeed, turbine_class):
+    def set_probability_turbine_class(self, windspeed, turbine_class, idx=None):
         """
         Sets the probability of each output in the list based on a Weibull distribution
         (shape parameter 2) and average velocity as determined by IEC turbine class standards.
@@ -445,6 +396,8 @@ class Crunch:
             ('Wind1VelX` in OpenFAST)
         turbine_class : int or str
             Turbine class either 1/'I' or 2/'II' or 3/'III'
+        idx: list or Numpy array (default None)
+            Index vector into output case list
         """
 
         # IEC average velocities
@@ -457,10 +410,13 @@ class Crunch:
         elif turbine_class in [3, "III"]:
             Vavg = 37.5 * 0.2
 
-        self.set_probability_distribution(windspeed, Vavg, weibull_k=2.0, kind="weibull")
+        else:
+            raise ValueError(f"Unknown turbine class, {turbine_class}")
+
+        self.set_probability_distribution(windspeed, Vavg, weibull_k=2.0, kind="weibull", idx=idx)
 
         
-    def compute_aep(self, pwrchan, loss_factor=1.0):
+    def compute_aep(self, pwrchan, loss_factor=1.0, idx=None):
         """
         Computes annual energy production based on all outputs in the list.
 
@@ -472,6 +428,8 @@ class Crunch:
         loss_factor : float
             Multiplicative loss factor for availability and other losses
             (soiling, array, etc.) to apply to AEP calculation (1.0 = no losses)"
+        idx: list or Numpy array (default None)
+            Index vector into output case list
 
         Returns
         ----------
@@ -482,18 +440,22 @@ class Crunch:
             Unweighted AEP that assumes all outputs in the list are equally
             likely (just a mean)
         """
-        
+
         # Energy for every output case
         E = np.array( self.compute_energy(pwrchan) )
-
-        # Elapsed time over the simulations
         T = np.array( self.elapsed_time() )
+        prob = self.prob.copy()
 
+        if idx is not None and len(idx) > 0:
+            E = E[idx]
+            T = T[idx]
+            prob = prob[idx]
+            
         # Calculate scaling factor for year with losses included
         fact = loss_factor * 365.0 * 24.0 * 60.0 * 60.0 / T.sum()
 
         # Sum with probability
-        aep_weighted = fact * np.dot(E, self.prob)
+        aep_weighted = fact * np.dot(E, prob)
 
         # Assume equal probability
         aep_unweighted = fact * E.mean()
@@ -501,12 +463,18 @@ class Crunch:
         return aep_weighted, aep_unweighted
 
     
-    def compute_total_fatigue(self):
+    def compute_total_fatigue(self, idx=None):
         """
         Computes total damage equivalent load and total damage based on all
         outputs in the list.
 
-        The `process_outputs` function shuld be run before this.
+        The `process_outputs` function shuld be run before this if the
+        output statisctics were not added in streaming mode.
+
+        Parameters
+        ----------
+        idx: list or Numpy array (default None)
+            Index vector into output case list
 
         Returns
         ----------
@@ -515,99 +483,169 @@ class Crunch:
         total_damage : Pandas DataFrame
             Weighted and unweighted summations of damage for each fatigue channel
         """
+        prob   = self.prob.copy()
+        dels   = self.dels.fillna(0.0)
+        damage = self.damage.fillna(0.0)
         
-        if self.dels:
-            # These should come out as pandas Series
-            dels_weighted = np.sum(self.prob[:,np.newaxis] * self.dels, axis=0)
-            dels_unweighted = self.dels.mean()
-            damage_weighted = np.sum(self.prob[:,np.newaxis] * self.damage, axis=0)
-            damage_unweighted = self.damage.mean()
+        if idx is not None and len(idx) > 0:
+            prob = prob[idx]
+        
+        if len(dels) > 0:
+            if idx is not None and len(idx) > 0:
+               dels = dels.iloc[idx]
+
+            dels_weighted = np.sum(prob[:,np.newaxis] * dels, axis=0)
+            dels_unweighted = dels.mean(axis=0)
             
-            # Combine in to DataFrames
             dels_total = pd.DataFrame([dels_weighted, dels_unweighted],
                                       index=['Weighted','Unweighted'])
+        else:
+            dels_total = None
+            
+        if len(damage) > 0:
+            if idx is not None and len(idx) > 0:
+               damage = damage.iloc[idx]
+               
+            damage_weighted = np.sum(prob[:,np.newaxis] * damage, axis=0)
+            damage_unweighted = damage.mean(axis=0)
+            
             damage_total = pd.DataFrame([damage_weighted, damage_unweighted],
                                         index=['Weighted','Unweighted'])
-            return dels_total, damage_total
-        
         else:
-            print("No DELs found.  Please run process_outputs first.")
-            return None, None
+            damage_total = None
+            
+        return dels_total, damage_total
 
         
     # Batch versions of AeroelasticOutput methods
     def calculate_channel(self, instr, namein):
         for k in self.outputs:
             k.calculate_channel(instr, namein)
+            
     def trim_data(self, tmin=0, tmax=np.inf):
         for k in self.outputs:
             k.trim_data(tmin, tmax)
+            
     def append_magnitude_channels(self, magnitude_channels=None):
         for k in self.outputs:
             k.append_magnitude_channels(magnitude_channels)
+            
     def add_magnitude_channels(self, magnitude_channels=None):
         self.append_magnitude_channels(magnitude_channels)
+        
     def add_load_rose(self, load_rose=None, nsec=6):
         for k in self.outputs:
             k.add_load_rose(load_rose=load_rose, nsec=nsec)
+            
     def extremes(self, channels=None):
         return [m.extremes(channels) for m in self.outputs]
+
     def num_timesteps(self):
         return [m.num_timesteps for m in self.outputs]
+
     def num_channels(self):
         return [m.num_channels for m in self.outputs]
+    
     def elapsed_time(self):
-        return [m.elapsed_time for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return (self.summary_stats['Time']['max'].to_numpy() -
+                    self.summary_stats['Time']['min'].to_numpy()).tolist()
+        else:
+            return [m.elapsed_time for m in self.outputs]
+        
     def idxmins(self):
         return [m.idxmins for m in self.outputs]
+    
     def idxmaxs(self):
         return [m.idxmaxs for m in self.outputs]
+    
     def minima(self):
-        return [m.minima for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='min']).T.tolist()
+        else:
+            return [m.minima for m in self.outputs]
+        
     def maxima(self):
-        return [m.maxima for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='max']).T.tolist()
+        else:
+            return [m.maxima for m in self.outputs]
+        
     def ranges(self):
-        return [m.ranges for m in self.outputs]
+        return (np.array(self.maxima) - np.array(self.minima)).tolist()
+    
     def variable(self):
         return [m.variable for m in self.outputs]
+    
     def constant(self):
         return [m.constant for m in self.outputs]
+    
     def sums(self):
         return [m.sums for m in self.outputs]
+    
     def sums_squared(self):
         return [m.sums_squared for m in self.outputs]
+    
     def sums_cubed(self):
         return [m.sums_cubed for m in self.outputs]
+    
     def sums_fourth(self):
         return [m.sums_fourth for m in self.outputs]
+    
     def second_moments(self):
         return [m.second_moments for m in self.outputs]
+    
     def third_moments(self):
         return [m.third_moments for m in self.outputs]
+    
     def fourth_moments(self):
         return [m.fourth_moments for m in self.outputs]
+    
     def means(self):
-        return [m.means for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='mean']).T.tolist()
+        else:
+            return [m.means for m in self.outputs]
+        
     def medians(self):
-        return [m.medians for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='median']).T.tolist()
+        else:
+            return [m.medians for m in self.outputs]
+        
     def absmaxima(self):
         return [m.absmaxima for m in self.outputs]
+    
     def stddevs(self):
-        return [m.stddevs for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='std']).T.tolist()
+        else:
+            return [m.stddevs for m in self.outputs]
+        
     def skews(self):
         return [m.skews for m in self.outputs]
+    
     def kurtosis(self):
         return [m.kurtosis for m in self.outputs]
+    
     def integrated(self):
-        return [m.integrated for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='integrated']).T.tolist()
+        else:
+            return [m.integrated for m in self.outputs]
+        
     def compute_energy(self, pwrchan):
-        return [m.compute_energy(pwrchan) for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return self.summary_stats[pwrchan]['integrated'].tolist()
+        else:
+            return [m.compute_energy(pwrchan) for m in self.outputs]
+        
     def time_averaging(self, time_window):
         return [m.time_averaging(time_window) for m in self.outputs]
+    
     def time_binning(self, time_window):
         return [m.time_binning(time_window) for m in self.outputs]
-    def get_summary_stats(self):
-        return [m.get_summary_stats() for m in self.outputs]
+    
     def psd(self):
         return [m.psd() for m in self.outputs]
 

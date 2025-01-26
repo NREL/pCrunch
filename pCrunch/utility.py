@@ -6,6 +6,55 @@ from scipy.special import gamma
 from scipy.stats import rayleigh, weibull_min
 import numpy as np
 
+    
+# Could use a dict or namedtuple here, but this standardizes things a bit better for users
+class FatigueParams:
+    """Simple data structure of parameters needed by fatigue calculation."""
+
+    def __init__(self, **kwargs):
+        """
+        Creates an instance of `FatigueParams`.
+
+        Parameters
+        ----------
+        lifetime :  float (optional)
+            Design lifetime of the component / material in years
+        load2stress : float (optional)
+            Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
+        slope : float (optional)
+            Wohler exponent in the traditional SN-curve of S = A * N ^ -(1/m)
+        ult_stress : float (optional)
+            Ultimate stress for use in Goodman equivalent stress calculation
+        S_intercept : float (optional)
+            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
+        rainflow_bins : int
+            Number of bins used in rainflow analysis.
+            Default: 100
+        goodman_correction: boolean
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        return_damage: boolean
+            Whether to compute both DEL and damage
+            Default: False
+        """
+
+        self.lifetime      = kwargs.get("lifetime", 0.0)
+        self.load2stress   = kwargs.get("load2stress", 1.0)
+        self.slope         = kwargs.get("slope", 4.0)
+        self.ult_stress    = kwargs.get("ult_stress", 1.0)
+        temp               = kwargs.get("S_intercept", 0.0)
+        self.S_intercept   = temp if temp > 0.0 else self.ult_stress
+        self.bins          = kwargs.get("rainflow_bins", 100)
+        self.return_damage = kwargs.get("return_damage", False)
+        self.goodman       = kwargs.get("goodman_correction", False)
+
+    def copy(self):
+        return FatigueParams(lifetime=self.lifetime,
+                             load2stress=self.load2stress, slope=self.slope,
+                             ult_stress=self.ult_stress, S_intercept=self.S_intercept,
+                             bins=self.bins, return_damage=self.return_damage,
+                             goodman=self.goodman)
+
 def weibull_mean(x, k, xbar, kind="pdf"):
     """
     Weibull probability/cumulative density function using desired mean value.
