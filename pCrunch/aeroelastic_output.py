@@ -22,8 +22,8 @@ class AeroelasticOutput:
         # Initialize all properties
         self.data        = None
         self.channels    = None
-        self.description = ""
-        self.units       = None
+        self.description = kwargs.get("description", "")
+        self.units       = kwargs.get("units", None)
         self.filepath    = ""
 
         for k in ["dlc", "DLC", "name", "Name", "NAME", "filename","filepath","file"]:
@@ -33,13 +33,13 @@ class AeroelasticOutput:
 
         self.set_data(datain, channelsin)
 
-        self.append_magnitude_channels( kwargs.get("magnitude_channels", {}) )
+        self.append_magnitude_channels( kwargs.get("magnitude_channels", None) )
         
     def __getitem__(self, chan):
         try:
-            idx = np.where(self.channels == chan)[0][0]
+            idx = self.channels.index(chan)
 
-        except IndexError:
+        except ValueError:
             raise IndexError(f"Channel '{chan}' not found.")
 
         return self.data[:, idx]
@@ -49,27 +49,31 @@ class AeroelasticOutput:
 
 
     def set_data(self, datain, channelsin=None):
-        if isinstance(datain, dict):
-            self.channels = np.array([c.strip() for c in list(datain.keys())]) 
+        if datain is None:
+            return
+        
+        elif isinstance(datain, dict):
+            self.channels = [c.strip() for c in list(datain.keys())]
             self.data     = np.array(list(datain.values())).T
             
         elif isinstance(datain, list):
-            self.channels = np.array([c.strip() for c in channelsin])
-            self.data     = np.array(datain)
+            self.channels = [c.strip() for c in channelsin]
+            self.data     = np.array(datain).T
             
         elif isinstance(datain, pd.DataFrame):
-            self.channels = np.array([c.strip() for c in list(datain.columns)])
+            self.channels = [c.strip() for c in list(datain.columns)]
             self.data     = datain.to_numpy()
 
         elif isinstance(datain, np.ndarray):
-            self.channels = np.array([c.strip() for c in channelsin])
+            self.channels = [c.strip() for c in channelsin]
             self.data     = datain
 
         else:
             pass
             #print("Unknown data type.  Expected dict or list or DataFrame or Numpy Array")
             #print(f"Instead found, {type(datain)}")
-        
+
+            
 
     def _add_channel(self, datain, namein):
         """
@@ -79,8 +83,8 @@ class AeroelasticOutput:
             pass
             #print(f"Channel '{namein}' already exists.")
         else:
-            self.data = np.append(self.data, datain, axis=1)
-            self.channels = np.append(self.channels, namein)
+            self.data = np.c_[self.data, datain]
+            self.channels.append( namein )
         
     def add_channel(self, datain, namein=None):
         """
@@ -95,9 +99,12 @@ class AeroelasticOutput:
             for c in datain.keys():
                 self._add_channel(np.array(datain[c]), c.strip())
             
-        elif isinstance(datain, list) and isinstance(namein, list):
+        elif isinstance(datain, list) and isinstance(datain[0], list) and isinstance(namein, (list, tuple, np.ndarray)):
             for k in range(len(namein)):
                 self._add_channel(np.array(datain[k]), namein[k].strip())
+            
+        elif isinstance(datain, list) and isinstance(datain[0], (int, float)) and isinstance(namein, (list, tuple, np.ndarray)):
+            self._add_channel(np.array(datain), namein[0].strip())
             
         elif isinstance(datain, list) and isinstance(namein, str):
             self._add_channel(np.array(datain), namein.strip())
@@ -106,9 +113,12 @@ class AeroelasticOutput:
             for c in list(datain.columns):
                 self._add_channel(datain[c].to_numpy(), c.strip())
 
-        elif isinstance(datain, np.ndarray) and isinstance(namein, np.ndarray):
+        elif isinstance(datain, np.ndarray) and datain.ndim==2 and isinstance(namein, (list, tuple, np.ndarray)):
             for k in range(len(namein)):
                 self._add_channel(datain[:,k], namein[k].strip())
+                
+        elif isinstance(datain, np.ndarray) and datain.ndim==1 and isinstance(namein, (list, tuple, np.ndarray)):
+            self._add_channel(datain, namein[0].strip())
                 
         elif isinstance(datain, np.ndarray) and isinstance(namein, str):
             self._add_channel(datain, namein.strip())
@@ -139,7 +149,28 @@ class AeroelasticOutput:
     def to_dict(self):
         """Returns `self.data` as a dictionary."""
 
-        return {self.channels[k]:self.data[:,k] for k in range(len(self.channels))}
+        return {self.channels[k]:self.data[:,k].tolist() for k in range(len(self.channels))}
+
+    @dataproperty
+    def time(self):
+        return self["Time"]
+
+    @property
+    def filename(self):
+        return os.path.split(self.filepath)[-1]
+                
+    @property
+    def headers(self):
+        if getattr(self, "units", None) is None:
+            return None
+
+        else:
+            return [
+                self.channels[k]
+                if self.units[k] in ["", "-"]
+                else f"{self.channels[k]} [{self.units[k]}]"
+                for k in range(self.num_channels)
+            ]
             
     def trim_data(self, tmin=0, tmax=np.inf):
         """
@@ -160,22 +191,6 @@ class AeroelasticOutput:
             )
 
         self.data = self.data[idx,:]
-
-    @dataproperty
-    def time(self):
-        return self["Time"]
-
-    @time.setter
-    def time(self, time):
-        if "Time" in self.channels:
-            raise ValueError("'Time' channel already exists in output data.")
-
-        self.data = np.append(time, self.data, axis=1)
-        self.channels = np.append("Time", self.channels)
-
-    @property
-    def filename(self):
-        return os.path.split(self.filepath)[-1]
         
     def append_magnitude_channels(self, magnitude_channels=None):
         """
@@ -226,7 +241,7 @@ class AeroelasticOutput:
             if not isinstance(load_rose, dict):
                 raise ValueError("Expecting load rose channels as a dictionary, 'new-chan': ['chan_x', 'chan_y']")
 
-        thd = np.linspace(0, 360, nsec+1)
+        thd = np.linspace(0, 360, nsec+1)[:-1] # Don't need to repeat the 360 mark
         
         for rootstr, chans in load_rose.items():
             for td in thd:
@@ -235,19 +250,6 @@ class AeroelasticOutput:
                 new_data = self[chans[0]]*np.cos(tr) + self[chans[1]]*np.sin(tr)
                 self._add_channel(new_data, new_chan)
                 print(f"Added channel, {new_chan}")
-                
-    @property
-    def headers(self):
-        if getattr(self, "units", None) is None:
-            return None
-
-        else:
-            return [
-                self.channels[k]
-                if self.units[k] in ["", "-"]
-                else f"{self.channels[k]} [{self.units[k]}]"
-                for k in range(self.num_channels)
-            ]
         
     @dataproperty
     def num_timesteps(self):
@@ -382,7 +384,8 @@ class AeroelasticOutput:
         npts = int(time_window / dt)
         window = np.ones(npts) / npts # Basic rectangular filter
 
-        data_avg = np.zeros(self.data.shape)
+        new_timesteps = max(npts,self.num_timesteps) - min(npts,self.num_timesteps) + 1
+        data_avg = np.zeros((new_timesteps, self.num_channels))
         for k in range(len(self.channels)):
             data_avg[:,k] = np.convolve(self.data[:,k], window, 'valid')
 
@@ -413,7 +416,7 @@ class AeroelasticOutput:
         for i_bin in range(n_bins):
             t_start = i_bin * time_window  + self.time.min()
             t_end = (i_bin+1) * time_window    + self.time.min()
-            time_index = np.bitwise_and(self.time >= t_start, self.time < t_end)
+            time_index = np.logical_and(self.time >= t_start, self.time < t_end)
             if not np.any(time_index):
                 print('here')
             data_filtered = self.data[time_index,:]
@@ -456,7 +459,7 @@ class AeroelasticOutput:
     def extremes(self, channels=None):
         """"""
         if channels is None:
-            channels = list(self.channels)
+            channels = self.channels
             
         sorter = np.argsort(self.channels)
         exists = [c for c in channels if c in self.channels]
@@ -473,55 +476,62 @@ class AeroelasticOutput:
         return extremes
 
 
-    def compute_del(self, ts, lifetime, load2stress, slope, Sult, Sc=0.0, **kwargs):
+    def compute_del(self, chan, fatparams, **kwargs):
         """
-        Computes damage equivalent load of input `ts`.
+        Computes damage equivalent load of input `chan`.
 
         Parameters
         ----------
-        ts : str or np.array
+        chan : str or np.array
             Channel name or time series to calculate DEL for.
-        elapsed : int | float
-            Elapsed time of the time series.
-        lifetime : int | float
-            Design lifetime of the component / material in years
-        load2stress : float (optional)
+        fatparams : FatigueParameters object
+            Instance of FatigueParameters with all material and geometry parameters
+        lifetime : int | float (optional kwargs)
+            Design lifetime of the component / material in years. If specified, overrides fatparams value.
+        load2stress : float (optional kwargs)
             Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
-        slope : int | float
-            Slope of the fatigue curve.
-        Sult : float (optional)
-            Ultimate stress for use in Goodman equivalent stress calculation
-        Sc : float (optional)
-            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
-        rainflow_bins : int
+            If specified, overrides fatparams value.
+        slope : int | float (optional kwargs)
+            Slope of the fatigue curve.  If specified, overrides fatparams value.
+        ultimate_stress : float (optional kwargs)
+            Ultimate stress for use in Goodman equivalent stress calculation.  If specified, overrides fatparams value.
+        S_intercept : float (optional kwargs)
+            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified.
+            If specified, overrides fatparams value.
+        rainflow_bins : int (optional kwargs)
             Number of bins used in rainflow analysis.
             Default: 100
-        goodman_correction: boolean
+        goodman_correction: boolean (optional kwargs)
             Whether to apply Goodman mean correction to loads and stress
             Default: False
-        return_damage: boolean
+        return_damage: boolean (optional kwargs)
             Whether to compute both DEL and damage
             Default: False
         """
 
-        bins = kwargs.get("rainflow_bins", 100)
+        lifetime      = kwargs.get("lifetime", fatparams.lifetime)
+        load2stress   = kwargs.get("load2stress", fatparams.load2stress)
+        slope         = kwargs.get("slope", fatparams.slope)
+        Sult          = kwargs.get("ultimate_stress", fatparams.ult_stress)
+        Sc            = kwargs.get("S_intercept", 0.0)
+        Scin          = Sc if Sc > 0.0 else Sult
+        bins          = kwargs.get("rainflow_bins", 100)
         return_damage = kwargs.get("return_damage", False)
-        goodman = kwargs.get("goodman_correction", False)
-        Scin = Sc if Sc > 0.0 else Sult
-        elapsed = self.elapsed_time
-        if isinstance(ts, str):
-            ts = self[ts]
+        goodman       = kwargs.get("goodman_correction", False)
+        elapsed       = self.elapsed_time
+        if isinstance(chan, str):
+            chan = self[chan]
 
         # Default return values
         DEL = np.nan
         D   = np.nan
 
-        if np.all(np.isnan(ts)):
+        if np.all(np.isnan(chan)):
             return DEL, D
 
         # Working with loads for DELs
         try:
-            F, Fmean = fatpack.find_rainflow_ranges(ts, return_means=True)
+            F, Fmean = fatpack.find_rainflow_ranges(chan, return_means=True)
         except Exception:
             F = Fmean = np.zeros(1)
         if goodman and np.abs(load2stress) > 0.0:
@@ -539,7 +549,7 @@ class AeroelasticOutput:
         D = np.nan # default return value
         if return_damage and np.abs(load2stress) > 0.0:
             try:
-                S, Mrf = fatpack.find_rainflow_ranges(ts*load2stress, return_means=True)
+                S, Mrf = fatpack.find_rainflow_ranges(chan*load2stress, return_means=True)
             except Exception:
                 S = Mrf = np.zeros(1)
             if goodman:

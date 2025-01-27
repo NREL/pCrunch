@@ -62,11 +62,11 @@ class OpenFASTBinary(AeroelasticOutput):
         self.filepath = filepath
         self._chan_chars = kwargs.get("chan_char_length", 10)
         self._unit_chars = kwargs.get("unit_char_length", 10)
-        self.magnitude_channels = kwargs.get("magnitude_channels", {})
-        self.read()
+        mc = kwargs.get("magnitude_channels", None)
+        self.read(magnitude_channels=mc)
         self.fmt = 0
 
-    def read(self):
+    def read(self, magnitude_channels=None):
         """Reads the binary file."""
 
         with open(self.filepath, "rb") as f:
@@ -98,14 +98,12 @@ class OpenFASTBinary(AeroelasticOutput):
                 f, np.uint8, self._chan_chars * (num_channels + 1)
             ).reshape((num_channels + 1), self._chan_chars)
             channels_list = list("".join(map(chr, c)) for c in channels)
-            self.channels = np.array( [c.strip() for c in channels_list] )
+            self.channels = [c.strip() for c in channels_list]
 
             units = np.fromfile(
                 f, np.uint8, self._unit_chars * (num_channels + 1)
             ).reshape((num_channels + 1), self._unit_chars)
-            self.units = np.array(
-                list("".join(map(chr, c)).strip()[1:-1] for c in units)
-            )
+            self.units = list("".join(map(chr, c)).strip()[1:-1] for c in units)
             
             # Build time
             if self.fmt == 1:
@@ -129,7 +127,7 @@ class OpenFASTBinary(AeroelasticOutput):
                                             (raw - offset) / slopes],
                                            1)
 
-        self.append_magnitude_channels()
+        self.append_magnitude_channels(magnitude_channels=magnitude_channels)
 
 
 class OpenFASTAscii(AeroelasticOutput):
@@ -151,14 +149,10 @@ class OpenFASTAscii(AeroelasticOutput):
 
         super().__init__()
         self.filepath = filepath
-        self.magnitude_channels = kwargs.get("magnitude_channels", {})
-        self.read()
+        mc = kwargs.get("magnitude_channels", None)
+        self.read(magnitude_channels=mc)
 
-    @property
-    def time(self):
-        return self.data[:, 0]
-
-    def read(self):
+    def read(self, magnitude_channels=None):
         """Reads the ASCII file."""
 
         with open(self.filepath, "rb") as f:
@@ -168,7 +162,7 @@ class OpenFASTAscii(AeroelasticOutput):
                 -1, len(self.channels)
             )
 
-        self.append_magnitude_channels()
+        self.append_magnitude_channels(magnitude_channels=magnitude_channels)
 
     def parse_header(self, f):
         """Reads the header data for file."""
@@ -197,7 +191,7 @@ class OpenFASTAscii(AeroelasticOutput):
     def build_headers(self, chandata, unitdata):
         """Unpacks channels and units and builds the combined headers."""
 
-        self.channels = np.array([c.strip() for c in chandata.split("\t")])
-        self.units = np.array([u[1:-1] for u in unitdata.split("\t")])
+        self.channels = [c.strip() for c in chandata.split("\t")]
+        self.units = [u[1:-1] for u in unitdata.split("\t")]
 
         

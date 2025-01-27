@@ -186,30 +186,15 @@ class Crunch:
         D = {}
 
         for chan, fatparams in self.fc.items():
-            if "goodman_correction" in kwargs:
-                goodman = kwargs.get("goodman_correction", False)
-            else:
-                goodman = fatparams.goodman
-
-            if "rainflow_bins" in kwargs:
-                bins = kwargs.get("rainflow_bins", 100)
-            else:
-                bins = fatparams.bins
-
-            if "return_damage" in kwargs:
-                return_damage = kwargs.get("return_damage", False)
-            else:
-                return_damage = fatparams.return_damage
+            goodman = kwargs.get("goodman_correction", fatparams.goodman)
+            bins = kwargs.get("rainflow_bins", fatparams.bins)
+            return_damage = kwargs.get("return_damage", fatparams.return_damage)
                 
             try:
-
-                DELs[chan], D[chan] = output.compute_del(
-                    chan, fatparams.lifetime,
-                    fatparams.load2stress, fatparams.slope,
-                    fatparams.ult_stress, fatparams.S_intercept,
-                    goodman_correction=goodman, rainflow_bins=bins,
-                    return_damage=return_damage,
-                )
+                DELs[chan], D[chan] = output.compute_del(chan, fatparams,
+                                                         goodman_correction=goodman,
+                                                         rainflow_bins=bins,
+                                                         return_damage=return_damage)
 
             except IndexError:
                 print(f"Channel '{chan}' not included in DEL calculation.")
