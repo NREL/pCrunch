@@ -17,11 +17,11 @@ def execute_script(fscript):
     print("NOW RUNNING:", fscript)
     print()
     fullpath = os.path.join(examples_dir, fscript)
-    basepath = os.path.join(examples_dir, str(fscript).split("/")[0])
+    basepath = os.path.join(examples_dir, str(fscript).split(os.sep)[0])
     os.chdir(basepath)
 
     # Get script/module name
-    froot = str(fscript).split("/")[-1]
+    froot = str(fscript).split(os.sep)[-1]
 
     # Use dynamic import capabilities
     # https://www.blog.pythonlibrary.org/2016/05/27/python-201-an-intro-to-importlib/
