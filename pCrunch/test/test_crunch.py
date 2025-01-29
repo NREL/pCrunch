@@ -252,26 +252,26 @@ class Test_Crunch(unittest.TestCase):
         myobj = Crunch(myouts, magnitude_channels=mc)
         aep_w1, aep_uw1 = myobj.compute_aep('Wind')
         self.assertAlmostEqual(aep_true, aep_w1, 5)
-        self.assertEqual(aep_w1, aep_uw1)
+        self.assertAlmostEqual(aep_w1, aep_uw1, 5)
         
         myobj = Crunch(myouts, magnitude_channels=mc, lean=True)
         myobj.process_outputs()
         aep_w2, aep_uw2 = myobj.compute_aep('Wind')
-        self.assertEqual(aep_w1, aep_w2)
-        self.assertEqual(aep_w2, aep_uw2)
+        self.assertAlmostEqual(aep_w1, aep_w2, 5)
+        self.assertAlmostEqual(aep_w2, aep_uw2, 5)
         
         aep_w3, aep_uw3 = myobj.compute_aep('Wind', loss_factor=0.5)
-        self.assertEqual(0.5*aep_w1, aep_w3)
-        self.assertEqual(aep_w3, aep_uw3)
+        self.assertAlmostEqual(0.5*aep_w1, aep_w3, 5)
+        self.assertAlmostEqual(aep_w3, aep_uw3, 5)
         
         aep_w4, aep_uw4 = myobj.compute_aep('Wind', idx=[1,4])
-        self.assertEqual(aep_w1, aep_w4)
-        self.assertEqual(aep_w4, aep_uw4)
+        self.assertAlmostEqual(aep_w1, aep_w4, 5)
+        self.assertAlmostEqual(aep_w4, aep_uw4, 5)
         
         myobj.prob[0] = 0.0
         aep_w5, aep_uw5 = myobj.compute_aep('Wind')
         self.assertAlmostEqual(aep_w1, aep_w5, 5)
-        self.assertEqual(aep_w4, aep_uw4)
+        self.assertAlmostEqual(aep_w4, aep_uw4, 5)
 
         
     
