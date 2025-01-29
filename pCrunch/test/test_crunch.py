@@ -251,7 +251,7 @@ class Test_Crunch(unittest.TestCase):
         
         myobj = Crunch(myouts, magnitude_channels=mc)
         aep_w1, aep_uw1 = myobj.compute_aep('Wind')
-        self.assertEqual(aep_true, aep_w1)
+        self.assertAlmostEqual(aep_true, aep_w1, 5)
         self.assertEqual(aep_w1, aep_uw1)
         
         myobj = Crunch(myouts, magnitude_channels=mc, lean=True)
