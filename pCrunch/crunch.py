@@ -8,7 +8,7 @@ from .utility import weibull_mean, rayleigh_mean
 class Crunch:
     """Implementation of `mlife` in python."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, outputs=[], **kwargs):
         """
         Creates an instance of `pyLife`.
 
@@ -21,10 +21,12 @@ class Crunch:
         fatigue_channels : dict (optional)
             Dictionary with format:
             'channel': 'fatigue slope'
+        extreme_channels : list (optional)
+            Limit calculation of extremes to the channel names in the list.  Unspecified means all channels are processed and reported.
         magnitude_channels : dict (optional)
             Additional channels as vector magnitude of other channels.
             Format: 'new-chan': ['chan1', 'chan2', 'chan3']
-        trim_data : tuple (optional)
+        trim_data : tuple or list (optional)
             Trim processed outputs to desired times.
             Format: (min, max)
         probability : list, tuple, or Numpy array (optional)
@@ -34,7 +36,6 @@ class Crunch:
 
         self.lean_flag = kwargs.get("lean", False)
         
-        outputs = kwargs.get("outputs", [])
         if isinstance(outputs, list):
             self.outputs = outputs
         else:
@@ -44,10 +45,10 @@ class Crunch:
         self.td = kwargs.get("trim_data", ())
         self.trim_data(*self.td)
 
-        self.mc = kwargs.get("magnitude_channels", {})
+        self.mc = kwargs.get("magnitude_channels", None)
         self.append_magnitude_channels(self.mc)
         
-        self.ec = kwargs.get("extreme_channels", True)
+        self.ec = kwargs.get("extreme_channels", [])
         self.fc = kwargs.get("fatigue_channels", {})
         
         self.prob = kwargs.get("probability", np.array([]))
@@ -59,6 +60,20 @@ class Crunch:
         self.extremes = {}
         self.dels = pd.DataFrame()
         self.damage = pd.DataFrame()
+
+    def copy(self):
+        mycp =  type(self)(outputs = self.outputs,
+                           lean = self.lean_flag,
+                           trim_data = self.td,
+                           magnitude_channels = self.mc,
+                           extreme_channels = self.ec,
+                           fatigue_channels = self.fc,
+                           probability = self.prob)
+        mycp.summary_stats = self.summary_stats.copy()
+        mycp.extremes = self.extremes.copy()
+        mycp.dels = self.dels.copy()
+        mycp.damage = self.damage.copy()
+        return mycp
         
     def process_outputs(self, cores=1, **kwargs):
         """
@@ -83,6 +98,8 @@ class Crunch:
         damage = {}
 
         for ifile, istats, iextrs, idels, idamage in returned:
+            if ifile == '':
+                ifile = len(stats)
             stats[ifile]  = istats
             extrs[ifile]  = iextrs
             dels[ifile]   = idels
@@ -110,11 +127,10 @@ class Crunch:
         
         stats = output.get_summary_stats()
 
-        if self.ec is True:
-            extremes = output.extremes()
-
-        elif isinstance(self.ec, list):
+        if isinstance(self.ec, list) and len(self.ec) > 0:
             extremes = output.extremes(self.ec)
+        else:
+            extremes = output.extremes()
 
         dels, damage = self.get_DELs(output, **kwargs)
 
@@ -142,14 +158,18 @@ class Crunch:
         fname, stats, extremes, dels, damage =  self.process_single(output, **kwargs)
 
         # Add to output stat containers
-        self.dd_output_stats(fname, stats, extremes, dels, damage)
+        self.add_output_stats(fname, stats, extremes, dels, damage)
 
         
     def add_output_stats(self, fname, stats, extremes, dels, damage):
 
         # Append to the stats logs
-        summary_stats = self._process_summary_stats( {fname:stats} )
-        self.summary_stats = pd.concat((self.summary_stats, summary_stats), axis=0)
+        statsdf = self._process_summary_stats( {fname:stats} )
+        ndf = len(statsdf.index)+len(self.summary_stats.index)
+        nidx = len(set(list(statsdf.index)+list(self.summary_stats.index)))
+        ignore_flag = nidx < ndf
+        self.summary_stats = pd.concat((self.summary_stats, statsdf), axis=0,
+                                       ignore_index=ignore_flag)
 
         # Extreme events- join dictionaries
         self.extremes = self._process_extremes( {'null':self.extremes, fname:extremes} )
@@ -305,7 +325,10 @@ class Crunch:
         if isinstance(windspeed, str):
             # If user passed wind u-component channel name (e.g. 'Wind1VelX'),
             # then get mean value for every case
-            mywindspeed = np.array( [np.mean( k[windspeed] ) for k in self.outputs] )
+            if len(self.summary_stats) > 0:
+                mywindspeed = self.summary_stats[windspeed]['mean'].to_numpy()
+            else:
+                mywindspeed = np.array( [np.mean( k[windspeed] ) for k in self.outputs] )
             if idx is not None and len(idx) > 0:
                 mywindspeed = mywindspeed[idx]
         else:
@@ -313,6 +336,8 @@ class Crunch:
             mywindspeed = np.array(windspeed)
             if idx is not None and len(idx) > 0:
                 ntarget = len(idx)
+                if mywindspeed.size == self.noutputs:
+                    mywindspeed = mywindspeed[idx]
             else:
                 ntarget = self.noutputs
             if mywindspeed.size != ntarget:
@@ -358,6 +383,13 @@ class Crunch:
             
         elif kind.lower() in ["rayleigh", "rayliegh"]:
             prob = rayleigh_mean(mywindspeed, v_avg, kind="pdf")
+
+        elif kind.lower() in ["uniform"]:
+            prob = np.ones(mywindspeed.shape)
+
+        else:
+            print(f"Unknown probability distribution, {kind}, defaulting to uniform")
+            prob = np.ones(mywindspeed.shape)
 
         # Ensure probability sums to one for all of our cases
         self._reset_probabilities()
@@ -435,16 +467,20 @@ class Crunch:
             E = E[idx]
             T = T[idx]
             prob = prob[idx]
-            
-        # Calculate scaling factor for year with losses included
-        fact = loss_factor * 365.0 * 24.0 * 60.0 * 60.0 / T.sum()
 
-        # Sum with probability
-        aep_weighted = fact * np.dot(E, prob)
+        # Make sure our probabilities sum appropriately
+        prob = prob / prob.sum()
+
+        # Calculate scaling factor for year with losses included
+        fact = loss_factor * 365.0 * 24.0 * 60.0 * 60.0
+
+        # Sum with probability.  Finding probability weighted average per second, scaled by total seconds
+        aep_weighted = fact * np.dot(E, prob) / np.dot(T, prob)
 
         # Assume equal probability
-        aep_unweighted = fact * E.mean()
-        
+        prob = np.ones(E.shape)/E.size
+        aep_unweighted = fact * np.dot(E, prob) / np.dot(T, prob)
+
         return aep_weighted, aep_unweighted
 
     
@@ -521,15 +557,15 @@ class Crunch:
     def add_load_rose(self, load_rose=None, nsec=6):
         for k in self.outputs:
             k.add_load_rose(load_rose=load_rose, nsec=nsec)
-            
-    def extremes(self, channels=None):
-        return [m.extremes(channels) for m in self.outputs]
 
     def num_timesteps(self):
         return [m.num_timesteps for m in self.outputs]
 
     def num_channels(self):
-        return [m.num_channels for m in self.outputs]
+        if len(self.summary_stats) > 0:
+            return [len([a for a,b in self.summary_stats.columns if b=='min'])]*self.noutputs
+        else:
+            return [m.num_channels for m in self.outputs]
     
     def elapsed_time(self):
         if len(self.summary_stats) > 0:
@@ -557,7 +593,7 @@ class Crunch:
             return [m.maxima for m in self.outputs]
         
     def ranges(self):
-        return (np.array(self.maxima) - np.array(self.minima)).tolist()
+        return (np.array(self.maxima()) - np.array(self.minima())).tolist()
     
     def variable(self):
         return [m.variable for m in self.outputs]
@@ -626,10 +662,16 @@ class Crunch:
             return [m.compute_energy(pwrchan) for m in self.outputs]
         
     def time_averaging(self, time_window):
-        return [m.time_averaging(time_window) for m in self.outputs]
+        mycp = self.copy()
+        mycp.outputs = [m.time_averaging(time_window) for m in self.outputs]
+        mycp.process_outputs()
+        return mycp
     
     def time_binning(self, time_window):
-        return [m.time_binning(time_window) for m in self.outputs]
+        mycp = self.copy()
+        mycp.outputs = [m.time_binning(time_window) for m in self.outputs]
+        mycp.process_outputs()
+        return mycp
     
     def psd(self):
         return [m.psd() for m in self.outputs]
