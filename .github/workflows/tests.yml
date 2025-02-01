@@ -30,6 +30,7 @@ jobs:
 
             - name: Pip Install 
               run: |
+                  '${{ steps.cp.outputs.python-path }}' -m pip install matplotlib
                   '${{ steps.cp.outputs.python-path }}' -m pip install -v -e .[test]
 
             - name: Test run
@@ -44,7 +45,6 @@ jobs:
             - name: Test examples
               run: |
                   cd examples
-                  pip install matplotlib
                   treon -v .
                   
 

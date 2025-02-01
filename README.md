@@ -13,25 +13,29 @@ To set up pCrunch for development, follow these steps:
 1. Download the [Miniforge3](https://github.com/conda-forge/miniforge?tab=readme-ov-file#miniforge3) variant of Anaconda
 2. Open a terminal (or the Miniforge terminal on Windows) and create a new environment for the project with the following.
 
-        conda create -n pcrunch-dev
+        conda config --add channels conda-forge
+        conda install git
+        git clone https://github.com/NREL/pCrunch.git
+        cd pCrunch
+        conda env create --name pcrunch-dev -f environment.yml
+        conda activate pcrunch-dev
+
 
 3. To activate/deactivate the environment, use the following commands.
 
         conda activate pcrunch-dev
         conda deactivate pcrunch-dev
+		
 
-4. Install dependencies needed for running and development
+4. Install additional packages for testing
 
-        conda install fatpack numpy pandas pyyaml ruamel.yaml scipy numexpr pytest treon
+        conda install pytest treon
 
-4. Clone the repository:
 
-        git clone https://github.com/NREL/pCrunch.git
+5. Install pCrunch as an editable package with following commands.
 
-5. Navigate to the top level of the repository (`<path-to-pCrunch>/pCrunch/`) and install pCrunch as an editable package
-   with following commands.
+        pip install -e . -v
 
-        pip install -ev .
 
 ## Examples and Documentation
 
