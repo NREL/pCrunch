@@ -275,40 +275,40 @@ class Crunch:
             'abs', 'mean', 'std'.
         """
         if not isinstance(ranking_vars, (list, tuple, set)):
-            raise ValueError('Need a list or tuple of ranking variables')
+            ranking_vars = [ranking_vars]
+            #raise ValueError('Need a list or tuple of ranking variables')
         if not isinstance(ranking_stats, (list, tuple, set)):
-            raise ValueError('Need a list or tuple of ranking statistics')
-        
-        summary_stats = self.summary_stats.copy().swaplevel(axis=1).stack()
+            ranking_stats = [ranking_stats]
+            #raise ValueError('Need a list or tuple of ranking statistics')
+
+        summary_stats = self.summary_stats.copy().swaplevel(axis=1).stack(future_stack=True)
 
         out = []
-        for var, stat in zip(ranking_vars, ranking_stats):
+        for var in ranking_vars:
+            for stat in ranking_stats:
 
-            if not isinstance(var, list):
-                var = [var]
+                col = pd.MultiIndex.from_product([self.summary_stats.index, [var]])
+                if stat in ["max", "abs"]:
+                    res = (*summary_stats.loc[col][stat].idxmax(), stat,
+                           summary_stats.loc[col][stat].max())
 
-            col = pd.MultiIndex.from_product([self.outputs, var])
-            if stat in ["max", "abs"]:
-                res = (*summary_stats.loc[col][stat].idxmax(),
-                       stat,
-                       summary_stats.loc[col][stat].max(),
-                       )
+                elif stat == "min":
+                    res = (*summary_stats.loc[col][stat].idxmin(), stat,
+                           summary_stats.loc[col][stat].min())
 
-            elif stat == "min":
-                res = (*summary_stats.loc[col][stat].idxmin(),
-                       stat,
-                       summary_stats.loc[col][stat].min(),
-                       )
+                elif stat == "mean":
+                    res = ("NA", var, stat, summary_stats.loc[col][stat].mean())
 
-            elif stat in ["mean", "std"]:
-                res = (np.nan, ", ".join(var), stat,
-                       summary_stats.loc[col][stat].mean(),
-                       )
+                elif stat == "median":
+                    res = ("NA", var, stat, summary_stats.loc[col][stat].median())
 
-            else:
-                raise NotImplementedError(f"Statistic '{stat}' not supported for load ranking.")
+                elif stat == "std":
+                    res = ("NA", var, stat, summary_stats.loc[col][stat].std())
 
-            out.append(res)
+                else:
+                    raise NotImplementedError(f"Statistic '{stat}' not supported for load ranking.")
+
+                out.append(res)
 
         return pd.DataFrame(out, columns=["file", "channel", "stat", "val"])
 

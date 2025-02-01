@@ -193,13 +193,12 @@ class Test_Crunch(unittest.TestCase):
         self.assertTrue(True)
 
     def testLoadRankings(self):
-        nrep = len(FOUTB)
         myouts = [read(os.path.join(DATA, m)) for m in FOUTB]
         
         # Serial
         myobj = Crunch(myouts, magnitude_channels=mc)
         myobj.process_outputs()
-        #print(myobj.get_load_rankings(['RotTorq'], ['mean']))
+        print(myobj.get_load_rankings(['RotTorq','GenPwr'], ['mean','max']))
         self.assertTrue(True)
 
     def testWindspeeds(self):
