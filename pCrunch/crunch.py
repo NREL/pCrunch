@@ -224,8 +224,8 @@ class Crunch:
 
             except IndexError:
                 print(f"Channel '{chan}' not included in DEL calculation.")
-                DELs[chan] = np.NaN
-                D[chan] = np.NaN
+                DELs[chan] = np.nan
+                D[chan] = np.nan
 
         return DELs, D
 
@@ -301,7 +301,7 @@ class Crunch:
                        )
 
             elif stat in ["mean", "std"]:
-                res = (np.NaN, ", ".join(var), stat,
+                res = (np.nan, ", ".join(var), stat,
                        summary_stats.loc[col][stat].mean(),
                        )
 
