@@ -1,10 +1,10 @@
 # pCrunch's Crunch class
 
-The Crunch class is a general analysis tool for batches of time-series based data across multiple environmental conditions (i.e., a full wind speed and turbulence seed sweep). The methods are agnostic to the aeroelastic multibody simulation tool (OpenFAST or HAWC2 or Bladed or QBlade or in-house equivalents). The AeroelasticOutput class provides the data containers for each individual simulation.  The AeroelasticOutput class provides many analysis capabilities and the Crunch class extends them into their batch versions.
+The `Crunch` class is a general analysis tool for batches of time-series based data across multiple environmental conditions (i.e., a full wind speed and turbulence seed sweep). The methods are agnostic to the aeroelastic multibody simulation tool (OpenFAST or HAWC2 or Bladed or QBlade or in-house equivalents). The `AeroelasticOutput` class provides the data containers for each individual simulation.  The `AeroelasticOutput` class provides many analysis capabilities and the `Crunch` class extends them into their batch versions.
 
-The Crunch class supports keeping all time series data in memory and a lean "streaming" version where outputs are processed and then deleted, retaining only the critical statistics and analysis outputs.
+The `Crunch` class supports keeping all time series data in memory and a lean "streaming" version where outputs are processed and then deleted, retaining only the critical statistics and analysis outputs.
 
-This file lays out some workflows and showcases capabilities of the Crunch class.  It is probably best to walk through the examples of the AeroelasticOutput class first.
+This file lays out some workflows and showcases capabilities of the `Crunch` class.  It is probably best to walk through the examples of the `AeroelasticOutput` class first.
 
 ## Creating a new class instance
 
