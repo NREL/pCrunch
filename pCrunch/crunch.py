@@ -202,7 +202,7 @@ class Crunch:
             Default: False
         """
         for k in kwargs:
-            if k not in ["rainflow_bins", "return_damage", "compute_damage", "goodman_correction"]:
+            if k not in ["rainflow_bins", "return_damage", "compute_damage", "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
             
 
@@ -211,6 +211,7 @@ class Crunch:
 
         for chan, fatparams in self.fc.items():
             goodman = kwargs.get("goodman_correction", fatparams.goodman)
+            goodman = kwargs.get("goodman", goodman)
             bins = kwargs.get("rainflow_bins", fatparams.bins)
             return_damage = kwargs.get("return_damage", fatparams.return_damage)
             return_damage = kwargs.get("compute_damage", return_damage)

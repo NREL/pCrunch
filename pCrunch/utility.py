@@ -48,11 +48,12 @@ class FatigueParams:
         self.return_damage = kwargs.get("return_damage", False)
         self.return_damage = kwargs.get("compute_damage", self.return_damage)
         self.goodman       = kwargs.get("goodman_correction", False)
+        self.goodman       = kwargs.get("goodman", self.goodman)
 
         for k in kwargs:
             if k not in ["lifetime", "load2stress", "slope", "ultimate_stress",
                          "S_intercept", "rainflow_bins", "return_damage", "compute_damage",
-                         "goodman_correction"]:
+                         "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
             
         

@@ -552,6 +552,7 @@ class AeroelasticOutput:
         return_damage = kwargs.get("return_damage", fatparams.return_damage)
         return_damage = kwargs.get("compute_damage", return_damage)
         goodman       = kwargs.get("goodman_correction", fatparams.goodman)
+        goodman       = kwargs.get("goodman", goodman)
         elapsed       = self.elapsed_time
         if isinstance(chan, str):
             chan = self[chan]
@@ -559,7 +560,7 @@ class AeroelasticOutput:
         for k in kwargs:
             if k not in ["lifetime", "load2stress", "slope", "ultimate_stress",
                          "S_intercept", "rainflow_bins", "return_damage", "compute_damage",
-                         "goodman_correction"]:
+                         "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
             
         # Default return values

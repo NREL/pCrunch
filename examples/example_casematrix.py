@@ -9,12 +9,12 @@ from pCrunch.utility import load_yaml, save_yaml, get_windspeeds, convert_summar
 
 
 def valid_extension(fp):
-    #return any([fnmatch(fp, ext) for ext in ["*.outb", "*.out"]])
-    return fnmatch(fp, "*.outb")
+    return any([fnmatch(fp, ext) for ext in ["*.outb", "*.out"]])
 
 if __name__ == '__main__':
     # Define input files paths
-    output_dir = "/Users/gbarter/devel/WEIS/examples/03_NREL5MW_OC3_spar/outputs/03_OC3_optimization/openfast_runs"
+    thisdir = os.path.dirname(os.path.realpath(__file__))
+    output_dir = os.path.join(thisdir, '..', 'pCrunch', 'test', 'data', 'DLC1p1')
     results_dir = os.path.join(output_dir, "results")
     save_results = True
 
@@ -79,32 +79,3 @@ if __name__ == '__main__':
     AEP2, _ = cruncher.compute_aep(pwrchan, loss_factor)
 
     print(f"AEP: {AEP1} vs {AEP2}")
-    # # ========== Plotting ==========
-    # an_plts = Analysis.wsPlotting()
-    # #  --- Time domain analysis ---
-    # filenames = [outfiles[0][2], outfiles[1][2]] # select the 2nd run from each dataset
-    # cases = {'Baseline': ['Wind1VelX', 'GenPwr', 'BldPitch1', 'GenTq', 'RotSpeed']}
-    # fast_dict = fast_io.load_FAST_out(filenames, tmin=30)
-    # fast_pl.plot_fast_out(cases, fast_dict)
-
-    # # Plot some spectral cases
-    # spec_cases = [('RootMyb1', 0), ('TwrBsFyt', 0)]
-    # twrfreq = .0716
-    # fig,ax = fast_pl.plot_spectral(fast_dict, spec_cases, show_RtSpeed=True,
-    #                         add_freqs=[twrfreq], add_freq_labels=['Tower'],
-    #                         averaging='Welch')
-    # ax.set_title('DLC1.1')
-
-    # # Plot a data distribution
-    # channels = ['RotSpeed']
-    # caseid = [0, 1]
-    # an_plts.distribution(fast_dict, channels, caseid, names=['DLC 1.1', 'DLC 1.3'])
-
-    # # --- Batch Statistical analysis ---
-    # # Bar plot
-    # fig,ax = an_plts.stat_curve(windspeeds, stats, 'RotSpeed', 'bar', names=['DLC1.1', 'DLC1.3'])
-
-    # # Turbulent power curve
-    # fig,ax = an_plts.stat_curve(windspeeds, stats, 'GenPwr', 'line', stat_idx=0, names=['DLC1.1'])
-
-    # plt.show()
