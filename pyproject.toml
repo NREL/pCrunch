@@ -4,19 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pCrunch"
-version = "1.1.0"
-description = "IO and Post Processing Interface for OpenFAST Results."
+version = "2.0.0"
+description = "IO and Post Processing for generic time series data of multibody aeroelastic wind turbine simulations."
 readme = "README.rst"
 requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
 keywords = ["wind", "turbine", "fatigue", "ultimate", "aeroelastic"]
 authors = [
   {name = "NREL WISDEM Team", email = "systems.engineering@nrel.gov" }
-]
-
-maintainers = [
-    {name = "Jake Nunemaker", email ="jake.nunemaker@nrel.gov"},
-    {name = "Nikhar Abbas", email ="nikhar.abbas@nrel.gov"},
 ]
 
 classifiers = [  # Optional
@@ -40,6 +35,7 @@ classifiers = [  # Optional
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3 :: Only",
   "Operating System :: Microsoft :: Windows",
   "Operating System :: POSIX :: Linux",
@@ -48,7 +44,7 @@ classifiers = [  # Optional
   "Operating System :: MacOS",
 ]
 
-dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy"]
+dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy", "numexpr"]
 
 # List additional groups of dependencies here (e.g. development
 # dependencies). Users will be able to install these using the "extras"
@@ -59,7 +55,6 @@ dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy"]
 # Similar to `dependencies` above, these must be valid existing
 # projects.
 [project.optional-dependencies] # Optional
-dev = ["pre-commit", "pylint", "flake8", "black", "isort"]
 test = ["pytest", "pytest-cov", "treon"]
 docs = ["sphinx", "sphinx_rtd_theme"]
 
@@ -92,31 +87,3 @@ namespaces = true
 # If there are data files included in your packages that need to be
 # installed, specify them here.
 "*" = ["*.out", "*.outb", "*.txt", "*.rst", "*.ipynb"]
-
-[tool.black]
-line-length = 88
-target-version = ['py311']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | _build
-  | buck-out
-  | build
-  | dist
-)/
-'''
-
-[tool.isort]
-multi_line_output = "3"
-include_trailing_comma = true
-force_grid_wrap = "0"
-use_parentheses = true
-line_length = "88"
-sections = "FUTURE,STDLIB,THIRDPARTY,FIRSTPARTY,LOCALFOLDER"
-known_first_party = "pCrunch,tests,library"
-length_sort = "1"

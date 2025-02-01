@@ -15,14 +15,14 @@ jobs:
             fail-fast: False
             matrix:
                 os: ["ubuntu-latest", "macOS-latest", "windows-latest"]
-                python-version: ["3.9", "3.10", "3.11"]
+                python-version: ["3.9", "3.10", "3.11", "3.12"]
 
         steps:
             - name: checkout repository
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Set up Python ${{ matrix.python-version }}
-              uses: actions/setup-python@v4
+              uses: actions/setup-python@v5
               id: cp
               with:
                   python-version: ${{ matrix.python-version }}
@@ -30,6 +30,7 @@ jobs:
 
             - name: Pip Install 
               run: |
+                  '${{ steps.cp.outputs.python-path }}' -m pip install matplotlib
                   '${{ steps.cp.outputs.python-path }}' -m pip install -v -e .[test]
 
             - name: Test run
@@ -44,4 +45,55 @@ jobs:
             - name: Test examples
               run: |
                   cd examples
-                  treon -v example.ipynb
+                  treon -v .
+                  
+
+    build_conda:
+        name: Conda Build (${{ matrix.os }}) - ${{ matrix.python-version }}
+        runs-on: ${{ matrix.os }}
+        defaults:
+            run:
+                shell: bash -el {0}
+                
+        strategy:
+            fail-fast: false #true
+            matrix:
+                os: ["ubuntu-latest", "macOS-latest", "windows-latest"]
+                python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+        steps:
+            - name: checkout repository
+              uses: actions/checkout@v4
+
+            - uses: conda-incubator/setup-miniconda@v3
+              # https://github.com/marketplace/actions/setup-miniconda
+              with:
+                  #mamba-version: "*"
+                  miniforge-version: "latest"
+                  auto-update-conda: true
+                  python-version: ${{ matrix.python-version }}
+                  environment-file: environment.yml
+                  activate-environment: test
+                  auto-activate-base: false
+
+            - name: Add additional dependencies for test
+              run: |
+                  conda install -y pytest treon matplotlib
+
+            - name: Debug
+              run: |
+                  conda list
+                  printenv | sort
+                    
+            - name: Conda Install pCrunch
+              run: |
+                  python -m pip install . -v
+
+            - name: Run tests
+              run: |
+                  python -m pytest -v --disable-warnings pCrunch
+
+            - name: Examples
+              run: |
+                  cd examples
+                  treon -v .

@@ -1,0 +1,16 @@
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - fatpack
+  - numexpr
+  - numpy
+  - pandas
+  - pip
+  - python
+  - pyyaml
+  - ruamel.yaml
+  - scipy
+  - setuptools
+  

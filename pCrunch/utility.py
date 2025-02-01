@@ -1,15 +1,108 @@
-__author__ = ["Nikhar Abbas", "Jake Nunemaker"]
-__copyright__ = "Copyright 2020, National Renewable Energy Laboratory"
-__maintainer__ = ["Nikhar Abbas", "Jake Nunemaker"]
-__email__ = ["nikhar.abbas@nrel.gov", "jake.nunemaker@nrel.gov"]
-
-
 import os
 
 import pandas as pd
-#from yaml import Dumper, Loader
 import ruamel.yaml as ry
+from scipy.special import gamma
+from scipy.stats import rayleigh, weibull_min
+import numpy as np
 
+    
+# Could use a dict or namedtuple here, but this standardizes things a bit better for users
+class FatigueParams:
+    """Simple data structure of parameters needed by fatigue calculation."""
+
+    def __init__(self, **kwargs):
+        """
+        Creates an instance of `FatigueParams`.
+
+        Parameters
+        ----------
+        lifetime :  float (optional)
+            Design lifetime of the component / material in years
+        load2stress : float (optional)
+            Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
+        slope : float (optional)
+            Wohler exponent in the traditional SN-curve of S = A * N ^ -(1/m)
+        ultimate_stress : float (optional)
+            Ultimate stress for use in Goodman equivalent stress calculation
+        S_intercept : float (optional)
+            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified
+        rainflow_bins : int
+            Number of bins used in rainflow analysis.
+            Default: 100
+        goodman_correction: boolean
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        return_damage: boolean
+            Whether to compute both DEL and damage
+            Default: False
+        """
+
+        self.lifetime      = kwargs.get("lifetime", 0.0)
+        self.load2stress   = kwargs.get("load2stress", 1.0)
+        self.slope         = kwargs.get("slope", 4.0)
+        self.ult_stress    = kwargs.get("ultimate_stress", 1.0)
+        temp               = kwargs.get("S_intercept", 0.0)
+        self.S_intercept   = temp if temp > 0.0 else self.ult_stress
+        self.bins          = kwargs.get("rainflow_bins", 100)
+        self.return_damage = kwargs.get("return_damage", False)
+        self.return_damage = kwargs.get("compute_damage", self.return_damage)
+        self.goodman       = kwargs.get("goodman_correction", False)
+        self.goodman       = kwargs.get("goodman", self.goodman)
+
+        for k in kwargs:
+            if k not in ["lifetime", "load2stress", "slope", "ultimate_stress",
+                         "S_intercept", "rainflow_bins", "return_damage", "compute_damage",
+                         "goodman_correction", "goodman"]:
+                print(f"Unknown keyword argument, {k}")
+            
+        
+    def copy(self):
+        return FatigueParams(lifetime=self.lifetime,
+                             load2stress=self.load2stress, slope=self.slope,
+                             ult_stress=self.ult_stress, S_intercept=self.S_intercept,
+                             bins=self.bins, return_damage=self.return_damage,
+                             goodman=self.goodman)
+
+def weibull_mean(x, k, xbar, kind="pdf"):
+    """
+    Weibull probability/cumulative density function using desired mean value.
+    
+    Parameters
+    ----------
+    x : list or np.array
+        Vector of points to evaluate CDF
+    k : float
+        Weibull shape factor
+    xbar : float
+        Weibull mean value
+    """
+    scale = xbar / gamma(1.0 + 1.0 / k)
+    if kind.lower() == "pdf":
+        return weibull_min.pdf(x, k, loc=0, scale=scale)
+    elif kind.lower() == "cdf":
+        return weibull_min.cdf(x, k, loc=0, scale=scale)
+    else:
+        raise ValueError("Expected pdf/cdf for kind")
+
+def rayleigh_mean(x, xbar, kind="pdf"):
+    """
+    Weibull probability/cumulative density function using desired mean value.
+    
+    Parameters
+    ----------
+    x : list or np.array
+        Vector of points to evaluate CDF
+    xbar : float
+        Rayleigh mean value
+    """
+    scale = np.sqrt(2.0/np.pi) * xbar
+    if kind.lower() == "pdf":
+        return rayleigh.pdf(x, loc=0, scale=scale)
+    elif kind.lower() == "cdf":
+        return rayleigh.cdf(x, loc=0, scale=scale)
+    else:
+        raise ValueError("Expected pdf/cdf for kind")
 
 def df2dict(df):
     """
@@ -51,6 +144,45 @@ def df2dict(df):
 
     return dfd
 
+
+def dict2df(sumstats, names=None):
+    """
+    Build pandas datafrom from list of summary statistics.
+
+    Inputs:
+    -------
+    sumstats: list
+        List of the dictionaries loaded from post_process.load_yaml
+    names: list, optional
+        List of names for each run. len(sumstats)=len(names)
+
+    Returns:
+    --------
+    df: pd.DataFrame
+        pandas dataframe
+    """
+
+    if isinstance(sumstats, list):
+        if not names:
+            names = ["dataset_" + str(i) for i in range(len(sumstats))]
+        data_dict = {
+            (name, outerKey, innerKey): values
+            for name, sumdata in zip(names, sumstats)
+            for outerKey, innerDict in sumdata.items()
+            for innerKey, values in innerDict.items()
+        }
+
+    else:
+        data_dict = {
+            (outerKey, innerKey): values
+            for outerKey, innerDict in sumstats.items()
+            for innerKey, values in innerDict.items()
+        }
+
+    # Make dataframe
+    df = pd.DataFrame(data_dict)
+
+    return df
 
 def save_yaml(outdir, fname, data):
     """
@@ -102,45 +234,6 @@ def load_yaml(filepath):
 
     return data
 
-
-def dict2df(sumstats, names=None):
-    """
-    Build pandas datafrom from list of summary statistics.
-
-    Inputs:
-    -------
-    sumstats: list
-        List of the dictionaries loaded from post_process.load_yaml
-    names: list, optional
-        List of names for each run. len(sumstats)=len(names)
-
-    Returns:
-    --------
-    df: pd.DataFrame
-        pandas dataframe
-    """
-
-    if isinstance(sumstats, list):
-        if not names:
-            names = ["dataset_" + str(i) for i in range(len(sumstats))]
-        data_dict = {
-            (name, outerKey, innerKey): values
-            for name, sumdata in zip(names, sumstats)
-            for outerKey, innerDict in sumdata.items()
-            for innerKey, values in innerDict.items()
-        }
-
-    else:
-        data_dict = {
-            (outerKey, innerKey): values
-            for outerKey, innerDict in sumstats.items()
-            for innerKey, values in innerDict.items()
-        }
-
-    # Make dataframe
-    df = pd.DataFrame(data_dict)
-
-    return df
 
 
 def yaml2df(filename, names=[]):
@@ -210,41 +303,47 @@ def get_windspeeds(case_matrix, return_df=False):
     else:
         raise TypeError("case_matrix must be a dict or pd.DataFrame.")
 
-    windspeed = []
-    seed = []
-    IECtype = []
     # loop through and parse each inflow filename text entry to get wind and seed #
-    for fname in cmatrix[("InflowWind", "Filename_Uni")]:
-        if ".bts" in fname:
-            obj = fname.split("U")[-1].split("_")
-            obj2 = obj[1].split("Seed")[-1].split(".bts")
-            windspeed.append(float(obj[0]))
-            seed.append(float(obj2[0]))
-            if "NTM" in fname:
-                IECtype.append("NTM")
-            elif "ETM" in fname:
-                IECtype.append("NTM")
-            elif "EWM" in fname:
-                IECtype.append("EWM")
+    if ("InflowWind", "HWindSpeed") in cmatrix:
+        windspeed = [float(m) for m in cmatrix[("InflowWind", "HWindSpeed")]]
+        seed = [float(m) for m in cmatrix[("TurbSim", "RandSeed1")]]
+        IECtype = [None] * len(seed)
+
+    elif ("InflowWind", "Filename_Uni") in cmatrix:
+        windspeed = []
+        seed = []
+        IECtype = []
+        for fname in cmatrix[("InflowWind", "Filename_Uni")]:
+            if ".bts" in fname:
+                obj = fname.split("U")[-1].split("_")
+                obj2 = obj[1].split("Seed")[-1].split(".bts")
+                windspeed.append(float(obj[0]))
+                seed.append(float(obj2[0]))
+                if "NTM" in fname:
+                    IECtype.append("NTM")
+                elif "ETM" in fname:
+                    IECtype.append("NTM")
+                elif "EWM" in fname:
+                    IECtype.append("EWM")
+                else:
+                    IECtype.append("")
+
+            elif "ECD" in fname:
+                obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+                windspeed.append(float(obj))
+                seed.append([])
+                IECtype.append("ECD")
+
+            elif "EWS" in fname:
+                obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+                windspeed.append(float(obj))
+                seed.append([])
+                IECtype.append("EWS")
+
             else:
-                IECtype.append("")
-
-        elif "ECD" in fname:
-            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
-            windspeed.append(float(obj))
-            seed.append([])
-            IECtype.append("ECD")
-
-        elif "EWS" in fname:
-            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
-            windspeed.append(float(obj))
-            seed.append([])
-            IECtype.append("EWS")
-            
-        else:
-            print("Shouldn't get here")
-            print(fname)
-            breakpoint()
+                print("Shouldn't get here")
+                print(fname)
+                breakpoint()
 
     if return_df:
         case_matrix = pd.DataFrame(case_matrix)
