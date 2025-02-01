@@ -125,7 +125,7 @@ class Crunch:
         output.trim_data(*self.td)
         output.append_magnitude_channels(self.mc)
         
-        stats = output.get_summary_stats()
+        stats = output.summary_stats()
 
         if isinstance(self.ec, list) and len(self.ec) > 0:
             extremes = output.extremes(self.ec)
@@ -191,16 +191,20 @@ class Crunch:
         Parameters
         ----------
         output : AerolelasticOutput
-        rainflow_bins : int
+        rainflow_bins : int (optional)
             Number of bins used in rainflow analysis.
             Default: 100
-        goodman_correction: boolean
+        goodman_correction: boolean (optional)
             Whether to apply Goodman mean correction to loads and stress
             Default: False
-        return_damage: boolean
+        return_damage: boolean (optional)
             Whether to compute both DEL and damage
             Default: False
         """
+        for k in kwargs:
+            if k not in ["rainflow_bins", "return_damage", "compute_damage", "goodman_correction"]:
+                print(f"Unknown keyword argument, {k}")
+            
 
         DELs = {}
         D = {}
@@ -209,6 +213,7 @@ class Crunch:
             goodman = kwargs.get("goodman_correction", fatparams.goodman)
             bins = kwargs.get("rainflow_bins", fatparams.bins)
             return_damage = kwargs.get("return_damage", fatparams.return_damage)
+            return_damage = kwargs.get("compute_damage", return_damage)
                 
             try:
                 DELs[chan], D[chan] = output.compute_del(chan, fatparams,
@@ -256,7 +261,7 @@ class Crunch:
         return summary_stats, extremes, dels, damage
 
     
-    def get_load_rankings(self, ranking_vars, ranking_stats, **kwargs):
+    def get_load_rankings(self, ranking_vars, ranking_stats):
         """
         Returns load rankings across all outputs in `self.outputs`.
 
@@ -268,7 +273,11 @@ class Crunch:
             Summary statistic to evalulate. Currently supports 'min', 'max',
             'abs', 'mean', 'std'.
         """
-
+        if not isinstance(ranking_vars, (list, tuple, set)):
+            raise ValueError('Need a list or tuple of ranking variables')
+        if not isinstance(ranking_stats, (list, tuple, set)):
+            raise ValueError('Need a list or tuple of ranking statistics')
+        
         summary_stats = self.summary_stats.copy().swaplevel(axis=1).stack()
 
         out = []
@@ -433,7 +442,7 @@ class Crunch:
         self.set_probability_distribution(windspeed, Vavg, weibull_k=2.0, kind="weibull", idx=idx)
 
         
-    def compute_aep(self, pwrchan, loss_factor=1.0, idx=None):
+    def compute_aep(self, pwrchan, loss_factor=0.0, idx=None):
         """
         Computes annual energy production based on all outputs in the list.
 
@@ -443,8 +452,8 @@ class Crunch:
             Name of channel containing output electrical power in the simulation
             (e.g. 'GenPwr' in OpenFAST)
         loss_factor : float
-            Multiplicative loss factor for availability and other losses
-            (soiling, array, etc.) to apply to AEP calculation (1.0 = no losses)"
+            Loss factor for availability and other losses
+            (soiling, array, etc.) to apply to AEP calculation (0.0 = no losses)"
         idx: list or Numpy array (default None)
             Index vector into output case list
 
@@ -472,7 +481,7 @@ class Crunch:
         prob = prob / prob.sum()
 
         # Calculate scaling factor for year with losses included
-        fact = loss_factor * 365.0 * 24.0 * 60.0 * 60.0
+        fact = (1.0 - loss_factor) * 365.0 * 24.0 * 60.0 * 60.0
 
         # Sum with probability.  Finding probability weighted average per second, scaled by total seconds
         aep_weighted = fact * np.dot(E, prob) / np.dot(T, prob)
@@ -558,6 +567,14 @@ class Crunch:
         for k in self.outputs:
             k.add_load_rose(load_rose=load_rose, nsec=nsec)
 
+    def drop_channel(self, pattern):
+        for k in self.outputs:
+            k.drop_channel(pattern)
+    def delete_channel(self, pattern):
+        self.drop_channel(pattern)
+    def remove_channel(self, pattern):
+        self.drop_channel(pattern)
+        
     def num_timesteps(self):
         return [m.num_timesteps for m in self.outputs]
 
@@ -662,16 +679,12 @@ class Crunch:
             return [m.compute_energy(pwrchan) for m in self.outputs]
         
     def time_averaging(self, time_window):
-        mycp = self.copy()
-        mycp.outputs = [m.time_averaging(time_window) for m in self.outputs]
-        mycp.process_outputs()
-        return mycp
+        for m in self.outputs:
+            m.time_averaging(time_window)
     
     def time_binning(self, time_window):
-        mycp = self.copy()
-        mycp.outputs = [m.time_binning(time_window) for m in self.outputs]
-        mycp.process_outputs()
-        return mycp
+        for m in self.outputs:
+            m.time_binning(time_window)
     
     def psd(self):
         return [m.psd() for m in self.outputs]

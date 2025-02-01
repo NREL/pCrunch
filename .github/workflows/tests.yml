@@ -44,5 +44,5 @@ jobs:
             - name: Test examples
               run: |
                   cd examples
-                  treon -v example.ipynb
+                  treon -v .
                   

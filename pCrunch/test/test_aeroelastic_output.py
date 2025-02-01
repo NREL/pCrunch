@@ -99,15 +99,17 @@ class Test_AeroelasticOutput(unittest.TestCase):
         for k in data.keys():
             npt.assert_equal(myobj[k], data[k])
         npt.assert_equal(myobj["Wind"], data["WindVxi"])
+        self.assertEqual(myobj.chan_idx("WindVxi"), 1)
 
         mydict = myobj.to_dict()
         for k in data.keys():
             npt.assert_equal(mydict[k], data[k])
 
-    def testAddChannel(self):
+    def testAddDeleteChannel(self):
         # Adding same ones
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
-        myobj.add_channel(data)
+        self.assertEqual(myobj.data.shape, (10,5))
+        myobj.add_channel(data) # SHouldn't add anything
         self.assertEqual(myobj.data.shape, (10,5))
         npt.assert_equal(myobj.data[:,0], np.array(data["Time"]))
         npt.assert_equal(myobj.data[:,1], np.array(data["WindVxi"]))
@@ -126,6 +128,10 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.data.shape, (10,12))
         for k in range(5,12):
             npt.assert_equal(myobj.data[:,k], np.array(data["WindVxi"]))
+
+        # Now delete them
+        myobj.drop_channel('Test*')
+        self.assertEqual(myobj.data.shape, (10,5))
 
     def testCalcChannel(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
@@ -159,6 +165,7 @@ class Test_AeroelasticOutput(unittest.TestCase):
     def testProperties(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
         npt.assert_equal(myobj.num_timesteps, 10)
+        npt.assert_equal(myobj.dt, 1)
         npt.assert_equal(myobj.elapsed_time, 9)
         npt.assert_equal(myobj.num_channels, 5)
         npt.assert_equal(myobj.idxmins, np.zeros(5))
@@ -186,26 +193,26 @@ class Test_AeroelasticOutput(unittest.TestCase):
 
     def test_windowing(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
-        myobj_w1 = myobj.time_averaging(2.0)
-        npt.assert_equal(myobj_w1.data[:,0], np.array(data["Time"][:-1]) + 0.5)
-        npt.assert_equal(myobj_w1.data[:,2], 0.0)
-        npt.assert_equal(myobj_w1.data[:,3], 0.0)
+        myobj.time_averaging(2.0)
+        npt.assert_equal(myobj.data[:,0], np.array(data["Time"][:-1]) + 0.5)
+        npt.assert_equal(myobj.data[:,2], 0.0)
+        npt.assert_equal(myobj.data[:,3], 0.0)
 
-        myobj_w2 = myobj.time_binning(2.0)
-        npt.assert_equal(myobj_w2.data[:,0], np.array(data["Time"][::2]) + 0.5)
-        npt.assert_equal(myobj_w2.data[:,2], 0.0)
-        npt.assert_equal(myobj_w2.data[:,3], 0.0)
+        myobj = AeroelasticOutput(data, magnitude_channels=mc)
+        myobj.time_binning(2.0)
+        npt.assert_equal(myobj.data[:,0], np.array(data["Time"][::2]) + 0.5)
+        npt.assert_equal(myobj.data[:,2], 0.0)
+        npt.assert_equal(myobj.data[:,3], 0.0)
 
     def test_psd(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
-        f, P = myobj.psd()
-        self.assertEqual(f.shape[0], P.shape[0])
-        self.assertEqual(myobj.num_channels, P.shape[1])
+        freq_obj = myobj.psd()
+        self.assertEqual(myobj.num_channels, freq_obj.num_channels)
         
     def test_stats_extremes(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
 
-        stats = myobj.get_summary_stats()
+        stats = myobj.summary_stats()
         self.assertEqual(stats["Time"]['min'], 1.)
         self.assertEqual(stats["Time"]['max'], 10.)
         self.assertEqual(stats["Time"]['abs'], 10.)
@@ -217,35 +224,37 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(ext["Time"], {"Time":10., "WindVxi":8., "WindVyi":0., "WindVzi":0, "Wind":8.})
 
     def test_dels(self):
-        myparam = FatigueParams(lifetime=0.0,
-                                load2stress = 2446,
+        myparam = FatigueParams(lifetime=30.0,
+                                load2stress = 25.0,
                                 slope = 3.0,
-                                ult_stress = 6e8,
+                                ultimate_stress = 6e8,
                                 S_intercept = 5e9,
+                                goodman_correction = False,
+                                return_damage = True
                                 )
         t = np.linspace(0, 600, 10000)
-        y0 = 40e3 * np.sin(2*np.pi*t/60.0)
-        y1 = y0 + 40e3
+        y0 = 80e3 * np.sin(2*np.pi*t/60.0)
+        y80 = y0 + 80e3
         zeros = np.zeros(y0.shape)
         mydata = {"Time":t,
                   "Signal0":y0,
-                  "Signal40":y1,
+                  "Signal80":y80,
                   "Zeros":zeros}
 
-        mymagnitudes = {"Mag0":["Signal0", "Zeros", "Zeros"],
-                        "Mag40":["Signal40", "Zeros", "Zeros"]}
+        mymagnitudes = {"Mag0":["Signal0", "Zeros"],
+                        "Mag80":["Signal80", "Zeros"]}
 
         myfatigues = {"Signal0":myparam,
-                      "Signal40":myparam,
+                      "Signal80":myparam,
                       "Mag0":myparam,
-                      "Mag40":myparam}
+                      "Mag80":myparam}
 
         myobj = AeroelasticOutput(mydata, magnitude_channels=mymagnitudes)
         
         dels = np.zeros(len(myfatigues))
         dams = np.zeros(len(myfatigues))
         for ik, k in enumerate(myfatigues.keys()):
-            dels[ik], dams[ik] = myobj.compute_del(k, myparam, return_damage=True)
+            dels[ik], dams[ik] = myobj.compute_del(k, myfatigues[k])
 
         self.assertAlmostEqual(dels[0], dels[1])
         self.assertGreater(dels[0], dels[2])
@@ -254,6 +263,15 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertAlmostEqual(dams[0], dams[1])
         self.assertGreater(dams[0], dams[2])
         self.assertAlmostEqual(dams[0], dams[3])
+        
+        dels2 = np.zeros(len(myfatigues))
+        dams2 = np.zeros(len(myfatigues))
+        for ik, k in enumerate(myfatigues.keys()):
+            dels2[ik], dams2[ik] = myobj.compute_del(k, myfatigues[k], goodman_correction=True)
+        
+        self.assertGreater(dels2[1], dels2[0])
+        self.assertGreater(dams2[1], dams2[0])
+        #print(pd.DataFrame(np.c_[dels, dels2, dams, dams2], index=myfatigues.keys(), columns=['DELs', 'DELs-Goodman', 'Damage', 'Damage-Goodman']))
         
 if __name__ == "__main__":
     unittest.main()

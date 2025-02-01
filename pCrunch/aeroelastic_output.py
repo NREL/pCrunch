@@ -1,4 +1,5 @@
 import os
+import fnmatch
 import numpy as np
 import pandas as pd
 from scipy import stats, signal
@@ -34,20 +35,25 @@ class AeroelasticOutput:
         self.set_data(datain, channelsin)
 
         self.append_magnitude_channels( kwargs.get("magnitude_channels", None) )
-        
+
     def __getitem__(self, chan):
+        return self.data[:, self.chan_idx(chan)]
+
+    def __str__(self):
+        return self.description
+
+    def copy(self):
+        return AeroelasticOutput(self.data, self.channels, description=self.description,
+                                 units=self.units, name=self.filepath)
+
+    def chan_idx(self, chan):
         try:
             idx = self.channels.index(chan)
 
         except ValueError:
             raise IndexError(f"Channel '{chan}' not found.")
-
-        return self.data[:, idx]
-
-    def __str__(self):
-        return self.description
-
-
+        return idx
+    
     def set_data(self, datain, channelsin=None):
         if datain is None:
             return
@@ -73,8 +79,20 @@ class AeroelasticOutput:
             #print("Unknown data type.  Expected dict or list or DataFrame or Numpy Array")
             #print(f"Instead found, {type(datain)}")
 
-            
-
+    def drop_channel(self, pattern):
+        """
+        Drop channel based on a string pattern
+        """
+        idx = np.where([fnmatch.fnmatch(m, pattern) for m in self.channels])[0]
+        self.channels = np.delete( np.array(self.channels), idx).tolist()
+        self.data = np.delete(self.data, idx, axis=1)
+        
+    def delete_channel(self, pattern):
+        self.drop_channel(pattern)
+        
+    def remove_channel(self, pattern):
+        self.drop_channel(pattern)
+        
     def _add_channel(self, datain, namein):
         """
         Add new channels of data.  ASSUMES NUMPY ARRAY
@@ -123,17 +141,18 @@ class AeroelasticOutput:
         elif isinstance(datain, np.ndarray) and isinstance(namein, str):
             self._add_channel(datain, namein.strip())
 
+        elif isinstance(datain, str) and isinstance(namein, str):
+            new_data = ne.evaluate(datain, local_dict=self.to_dict())
+            self._add_channel(new_data, namein.strip())
+
         else:
             print("Unknown data type.  Expected dict or list or DataFrame or Numpy Array")
             print(f"Instead found, {type(datain)}")
 
-    def calculate_channel(self, instr, namein):
-        """
-        Add channel based on string expression
-        """
-        new_data = ne.evaluate(instr, local_dict=self.to_dict())
-        self._add_channel(new_data, namein.strip())
 
+    def calculate_channel(self, instr, namein):
+        self.add_channel(instr, namein)
+        
     def to_df(self):
         """Returns `self.data` as a DataFrame."""
 
@@ -183,11 +202,17 @@ class AeroelasticOutput:
         tmax : int | float
             Ending time.
         """
-
+        if tmin is None:
+            tmin = 0.0
+        if tmax is None:
+            tmax = np.inf
+        if tmin==0.0 and tmax==np.inf:
+            return
+        
         idx = np.where((self.time >= tmin) & (self.time <= tmax))[0]
-        if tmin > max(self.time):
+        if len(idx) == 0:
             raise ValueError(
-                f"Initial time '{tmin}' is after the end of the simulation."
+                f"No time steps after trimming. Provided: ({tmin}, {tmax}). Available: ({self.time.min()}, {self.time.max()})"
             )
 
         self.data = self.data[idx,:]
@@ -254,6 +279,10 @@ class AeroelasticOutput:
     @dataproperty
     def num_timesteps(self):
         return self.data.shape[0]
+    
+    @dataproperty
+    def dt(self):
+        return self.time[1] - self.time[0]
 
     @dataproperty
     def elapsed_time(self):
@@ -363,7 +392,11 @@ class AeroelasticOutput:
         """
         fs = 1. / np.diff(self.time)[0]
         freq, Pxx_den = signal.welch(self.data, fs, axis=0)
-        return freq, Pxx_den
+        fobj = self.copy()
+        fobj.data = Pxx_den
+        fobj.data[:,0] = freq
+        fobj.channels[0] = 'Freq'
+        return fobj
 
     def time_averaging(self, time_window):
         """
@@ -389,8 +422,8 @@ class AeroelasticOutput:
         for k in range(len(self.channels)):
             data_avg[:,k] = np.convolve(self.data[:,k], window, 'valid')
 
-        # Return a new AeroelasticOutput instance
-        return type(self)(data_avg, self.channels)
+        # Install the new data
+        self.data = data_avg
 
     
     def time_binning(self, time_window):
@@ -422,11 +455,11 @@ class AeroelasticOutput:
             data_filtered = self.data[time_index,:]
             data_binned[i_bin,:] = np.mean(data_filtered,axis=0)
 
-        # Return a new AeroelasticOutput instance
-        return type(self)(data_binned, self.channels)
+        # Install the new data
+        self.data = data_binned
 
 
-    def get_summary_stats(self):
+    def summary_stats(self):
         """
         Appends summary statistics to `self.summary_statistics` for each file.
         """
@@ -513,15 +546,22 @@ class AeroelasticOutput:
         load2stress   = kwargs.get("load2stress", fatparams.load2stress)
         slope         = kwargs.get("slope", fatparams.slope)
         Sult          = kwargs.get("ultimate_stress", fatparams.ult_stress)
-        Sc            = kwargs.get("S_intercept", 0.0)
+        Sc            = kwargs.get("S_intercept", fatparams.S_intercept)
         Scin          = Sc if Sc > 0.0 else Sult
-        bins          = kwargs.get("rainflow_bins", 100)
-        return_damage = kwargs.get("return_damage", False)
-        goodman       = kwargs.get("goodman_correction", False)
+        bins          = kwargs.get("rainflow_bins", fatparams.bins)
+        return_damage = kwargs.get("return_damage", fatparams.return_damage)
+        return_damage = kwargs.get("compute_damage", return_damage)
+        goodman       = kwargs.get("goodman_correction", fatparams.goodman)
         elapsed       = self.elapsed_time
         if isinstance(chan, str):
             chan = self[chan]
 
+        for k in kwargs:
+            if k not in ["lifetime", "load2stress", "slope", "ultimate_stress",
+                         "S_intercept", "rainflow_bins", "return_damage", "compute_damage",
+                         "goodman_correction"]:
+                print(f"Unknown keyword argument, {k}")
+            
         # Default return values
         DEL = np.nan
         D   = np.nan

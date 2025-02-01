@@ -20,6 +20,21 @@ data = {
     "WindVzi": [0] * 10,
 }
 mc = {"Wind": ["WindVxi", "WindVyi", "WindVzi"]}
+fc = {
+    "RootMc1": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8),
+    "RootMc2": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8),
+    "RootMc3": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8),
+}
+
+# Channels to focus on for extreme event tabulation
+ec = [
+    "RotSpeed",
+    "RotThrust",
+    "RotTorq",
+    "RootMc1",
+    "RootMc2",
+    "RootMc3",
+]
 
 class Test_Crunch(unittest.TestCase):
     
@@ -112,6 +127,14 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(len(myobj.outputs), 0)
         ss3, ext3, del3, dam3 = myobj.summary_stats, myobj.extremes, myobj.dels, myobj.damage
 
+        # All the fixins
+        myobj = Crunch(myouts[1:-1], magnitude_channels=mc, trim_data=(60., 500.),
+                       fatigue_channels=fc, extreme_channels=ec)
+        myobj.process_outputs()
+        self.assertEqual(myobj.noutputs, 3)
+        self.assertEqual(len(myobj.outputs), 3)
+        #ss4, ext4, del4, dam4 = myobj.summary_stats, myobj.extremes, myobj.dels, myobj.damage
+
         pdt.assert_frame_equal(ss1, ss2)
         pdt.assert_frame_equal(ss1, ss3)
 
@@ -170,6 +193,13 @@ class Test_Crunch(unittest.TestCase):
         self.assertTrue(True)
 
     def testLoadRankings(self):
+        nrep = len(FOUTB)
+        myouts = [read(os.path.join(DATA, m)) for m in FOUTB]
+        
+        # Serial
+        myobj = Crunch(myouts, magnitude_channels=mc)
+        myobj.process_outputs()
+        #print(myobj.get_load_rankings(['RotTorq'], ['mean']))
         self.assertTrue(True)
 
     def testWindspeeds(self):
@@ -237,6 +267,10 @@ class Test_Crunch(unittest.TestCase):
         
         myobj.set_probability_distribution('Wind', 7.5, kind='bleh', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
+        
+        myobj.set_probability_distribution(np.r_[15*np.ones(9), 7.5], 7.5, kind='weibull')
+        npt.assert_equal(myobj.prob[:-1], myobj.prob[0])
+        self.assertGreater(myobj.prob[-1], myobj.prob[-2])
 
         myobj.set_probability_turbine_class('Wind', 1)
         myobj.set_probability_turbine_class('Wind', 2)
@@ -276,8 +310,20 @@ class Test_Crunch(unittest.TestCase):
         
     
     def test_total_fatigue(self):
-        pass
+        nrep = len(FOUTB)
+        myouts = [read(os.path.join(DATA, m)) for m in FOUTB]
+        myobj = Crunch(myouts[1:-1], magnitude_channels=mc, fatigue_channels=fc)
+        myobj.process_outputs()
+        del1, dam1 = myobj.compute_total_fatigue()
 
+        myobj = Crunch(myouts[1:-1], lean=True, magnitude_channels=mc, fatigue_channels=fc)
+        myobj.process_outputs()
+        del2, dam2 = myobj.compute_total_fatigue()
+
+        pdt.assert_frame_equal(del1, del2)
+        pdt.assert_frame_equal(dam1, dam2)
+
+        
     def testProperties(self):
         myout = AeroelasticOutput(data)
         myouts = [myout]*10

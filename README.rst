@@ -1,23 +1,19 @@
 pCrunch
 =======
 
-IO and Post Processing Interface for OpenFAST Results.
+IO and Post Processing for generic time series data of multibody aeroelastic wind turbine simulations.  Readers are provided for OpenFAST outputs, but the analysis tools are equally applicable to HAWC2, Bladed, QBlade, ADAMS, or other tools.
 
-:Authors: Jake Nunemaker, Nikhar Abbas
-
-Installation
-------------
+Installation as a Library
+------------------------------------
 
 pCrunch is installable through pip via ``pip install pCrunch`` or conda, ``conda install pCrunch``.
 
 Development Setup
------------------
+-------------------
 
 To set up pCrunch for development, follow these steps:
 
-1. Download the latest version of `Miniconda <https://docs.conda.io/en/latest/miniconda.html>`_
-   for the appropriate OS. Follow the remaining `steps <https://conda.io/projects/conda/en/latest/user-guide/install/index.html#regular-installation>`_
-   for the appropriate OS version.
+1. Download the [Miniforge3](https://github.com/conda-forge/miniforge?tab=readme-ov-file#miniforge3) variant of Anaconda
 2. From the terminal, install pip by running: ``conda install -c anaconda pip``
 3. Next, create a new environment for the project with the following.
 
@@ -42,13 +38,6 @@ To set up pCrunch for development, follow these steps:
     .. code-block:: console
 
        pip install -e '.[dev]'
-
-6. (Preferred) Install the pre-commit hooks to autoformat code, ensuring
-   consistent code style across the repository.
-
-    .. code-block:: console
-
-        pre-commit install
 
 Examples
 --------

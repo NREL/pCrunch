@@ -59,7 +59,6 @@ dependencies = ["fatpack", "numpy", "pandas", "pyyaml", "ruamel.yaml", "scipy", 
 # Similar to `dependencies` above, these must be valid existing
 # projects.
 [project.optional-dependencies] # Optional
-dev = ["pre-commit", "pylint", "flake8", "black", "isort"]
 test = ["pytest", "pytest-cov", "treon"]
 docs = ["sphinx", "sphinx_rtd_theme"]
 
