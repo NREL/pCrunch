@@ -587,96 +587,96 @@ class Crunch:
     def elapsed_time(self):
         if len(self.summary_stats) > 0:
             return (self.summary_stats['Time']['max'].to_numpy() -
-                    self.summary_stats['Time']['min'].to_numpy()).tolist()
+                    self.summary_stats['Time']['min'].to_numpy())
         else:
-            return [m.elapsed_time for m in self.outputs]
+            return np.array( [m.elapsed_time for m in self.outputs] )
         
     def idxmins(self):
-        return [m.idxmins for m in self.outputs]
+        return np.array( [m.idxmins for m in self.outputs] )
     
     def idxmaxs(self):
-        return [m.idxmaxs for m in self.outputs]
+        return np.array( [m.idxmaxs for m in self.outputs] )
     
     def minima(self):
         if len(self.summary_stats) > 0:
-            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='min']).T.tolist()
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='min']).T
         else:
-            return [m.minima for m in self.outputs]
+            return np.array( [m.minima for m in self.outputs] )
         
     def maxima(self):
         if len(self.summary_stats) > 0:
-            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='max']).T.tolist()
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='max']).T
         else:
-            return [m.maxima for m in self.outputs]
+            return np.array( [m.maxima for m in self.outputs] )
         
     def ranges(self):
-        return (np.array(self.maxima()) - np.array(self.minima())).tolist()
+        return (np.array(self.maxima()) - np.array(self.minima()))
     
     def variable(self):
-        return [m.variable for m in self.outputs]
+        return np.array( [m.variable for m in self.outputs] )
     
     def constant(self):
-        return [m.constant for m in self.outputs]
+        return np.array( [m.constant for m in self.outputs] )
     
     def sums(self):
-        return [m.sums for m in self.outputs]
+        return np.array( [m.sums for m in self.outputs] )
     
     def sums_squared(self):
-        return [m.sums_squared for m in self.outputs]
+        return np.array( [m.sums_squared for m in self.outputs] )
     
     def sums_cubed(self):
-        return [m.sums_cubed for m in self.outputs]
+        return np.array( [m.sums_cubed for m in self.outputs] )
     
     def sums_fourth(self):
-        return [m.sums_fourth for m in self.outputs]
+        return np.array( [m.sums_fourth for m in self.outputs] )
     
     def second_moments(self):
-        return [m.second_moments for m in self.outputs]
+        return np.array( [m.second_moments for m in self.outputs] )
     
     def third_moments(self):
-        return [m.third_moments for m in self.outputs]
+        return np.array( [m.third_moments for m in self.outputs] )
     
     def fourth_moments(self):
-        return [m.fourth_moments for m in self.outputs]
+        return np.array( [m.fourth_moments for m in self.outputs] )
     
     def means(self):
         if len(self.summary_stats) > 0:
-            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='mean']).T.tolist()
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='mean']).T
         else:
-            return [m.means for m in self.outputs]
+            return np.array( [m.means for m in self.outputs] )
         
     def medians(self):
         if len(self.summary_stats) > 0:
-            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='median']).T.tolist()
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='median']).T
         else:
-            return [m.medians for m in self.outputs]
+            return np.array( [m.medians for m in self.outputs] )
         
     def absmaxima(self):
-        return [m.absmaxima for m in self.outputs]
+        return np.array( [m.absmaxima for m in self.outputs] )
     
     def stddevs(self):
         if len(self.summary_stats) > 0:
-            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='std']).T.tolist()
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='std']).T
         else:
-            return [m.stddevs for m in self.outputs]
+            return np.array( [m.stddevs for m in self.outputs] )
         
     def skews(self):
-        return [m.skews for m in self.outputs]
+        return np.array( [m.skews for m in self.outputs] )
     
     def kurtosis(self):
-        return [m.kurtosis for m in self.outputs]
+        return np.array( [m.kurtosis for m in self.outputs] )
     
     def integrated(self):
         if len(self.summary_stats) > 0:
-            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='integrated']).T.tolist()
+            return np.array([self.summary_stats[a,b].to_list() for a,b in self.summary_stats.columns if b=='integrated']).T
         else:
-            return [m.integrated for m in self.outputs]
+            return np.array( [m.integrated for m in self.outputs] )
         
     def compute_energy(self, pwrchan):
         if len(self.summary_stats) > 0:
-            return self.summary_stats[pwrchan]['integrated'].tolist()
+            return self.summary_stats[pwrchan]['integrated']
         else:
-            return [m.compute_energy(pwrchan) for m in self.outputs]
+            return np.array( [m.compute_energy(pwrchan) for m in self.outputs] )
         
     def time_averaging(self, time_window):
         for m in self.outputs:
