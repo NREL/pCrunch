@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
+import pandas.testing as pdt
 
 from pCrunch import AeroelasticOutput, FatigueParams
 
@@ -30,6 +31,10 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.units, None)
         self.assertEqual(myobj.description, "")
         self.assertEqual(myobj.filepath, "")
+        self.assertEqual(myobj.td, ())
+        self.assertEqual(myobj.mc, {})
+        self.assertEqual(myobj.ec, [])
+        self.assertEqual(myobj.fc, {})
 
         # Test keywords
         myobj = AeroelasticOutput(description="test", units=["m"]*5, name="label")
@@ -38,6 +43,10 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.units, ["m"]*5)
         self.assertEqual(myobj.description, "test")
         self.assertEqual(myobj.filepath, "label")
+        self.assertEqual(myobj.td, ())
+        self.assertEqual(myobj.mc, {})
+        self.assertEqual(myobj.ec, [])
+        self.assertEqual(myobj.fc, {})
 
         # As dict
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
@@ -51,6 +60,10 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.units, None)
         self.assertEqual(myobj.description, "")
         self.assertEqual(myobj.filepath, "")
+        self.assertEqual(myobj.td, ())
+        self.assertEqual(myobj.mc, mc)
+        self.assertEqual(myobj.ec, [])
+        self.assertEqual(myobj.fc, {})
 
         # As DataFrame
         myobj = AeroelasticOutput(pd.DataFrame(data), magnitude_channels=mc)
@@ -64,6 +77,10 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.units, None)
         self.assertEqual(myobj.description, "")
         self.assertEqual(myobj.filepath, "")
+        self.assertEqual(myobj.td, ())
+        self.assertEqual(myobj.mc, mc)
+        self.assertEqual(myobj.ec, [])
+        self.assertEqual(myobj.fc, {})
 
         # As Numpy
         myobj = AeroelasticOutput(myobj.data[:,:-1], list(data.keys()), magnitude_channels=mc)
@@ -77,6 +94,10 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.units, None)
         self.assertEqual(myobj.description, "")
         self.assertEqual(myobj.filepath, "")
+        self.assertEqual(myobj.td, ())
+        self.assertEqual(myobj.mc, mc)
+        self.assertEqual(myobj.ec, [])
+        self.assertEqual(myobj.fc, {})
 
         # As lists
         myobj = AeroelasticOutput([m for m in data.values()], list(data.keys()), magnitude_channels=mc)
@@ -90,6 +111,27 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.units, None)
         self.assertEqual(myobj.description, "")
         self.assertEqual(myobj.filepath, "")
+        self.assertEqual(myobj.td, ())
+        self.assertEqual(myobj.mc, mc)
+        self.assertEqual(myobj.ec, [])
+        self.assertEqual(myobj.fc, {})
+
+        # With trimming
+        myobj = AeroelasticOutput(data, magnitude_channels=mc, trim_data=[3,6])
+        self.assertEqual(myobj.data.shape, (4,5))
+        npt.assert_equal(myobj.data[:,0], np.array(data["Time"][2:6]))
+        npt.assert_equal(myobj.data[:,1], np.array(data["WindVxi"][2:6]))
+        npt.assert_equal(myobj.data[:,2], np.zeros(4))
+        npt.assert_equal(myobj.data[:,3], np.zeros(4))
+        npt.assert_equal(myobj.data[:,4], np.array(data["WindVxi"][2:6]))
+        self.assertEqual(myobj.channels, list(data.keys())+["Wind"])
+        self.assertEqual(myobj.units, None)
+        self.assertEqual(myobj.description, "")
+        self.assertEqual(myobj.filepath, "")
+        self.assertEqual(myobj.td, [3, 6])
+        self.assertEqual(myobj.mc, mc)
+        self.assertEqual(myobj.ec, [])
+        self.assertEqual(myobj.fc, {})
         
     def testGetters(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc, dlc="/testdir/testfile")
@@ -129,6 +171,10 @@ class Test_AeroelasticOutput(unittest.TestCase):
         for k in range(5,12):
             npt.assert_equal(myobj.data[:,k], np.array(data["WindVxi"]))
 
+        # Add gradient
+        myobj.add_gradient_channel('WindVxi', 'Test8')
+        npt.assert_almost_equal(myobj['Test8'], np.r_[np.zeros(4), 0.5, 0.5, np.zeros(4)])
+            
         # Now delete them
         myobj.drop_channel('Test*')
         self.assertEqual(myobj.data.shape, (10,5))
@@ -190,6 +236,7 @@ class Test_AeroelasticOutput(unittest.TestCase):
         npt.assert_equal(myobj.kurtosis.shape, (myobj.num_channels,))
         npt.assert_equal(myobj.integrated.shape, (myobj.num_channels,))
         npt.assert_equal(myobj.compute_energy('WindVxi'), myobj.integrated[1])
+        npt.assert_equal(myobj.total_travel('WindVxi'), 1.0)
 
     def test_windowing(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc)
@@ -249,7 +296,8 @@ class Test_AeroelasticOutput(unittest.TestCase):
                       "Mag0":myparam,
                       "Mag80":myparam}
 
-        myobj = AeroelasticOutput(mydata, magnitude_channels=mymagnitudes)
+        myobj = AeroelasticOutput(mydata, magnitude_channels=mymagnitudes,
+                                  fatigue_channels=myfatigues)
         
         dels = np.zeros(len(myfatigues))
         dams = np.zeros(len(myfatigues))
@@ -271,7 +319,28 @@ class Test_AeroelasticOutput(unittest.TestCase):
         
         self.assertGreater(dels2[1], dels2[0])
         self.assertGreater(dams2[1], dams2[0])
-        #print(pd.DataFrame(np.c_[dels, dels2, dams, dams2], index=myfatigues.keys(), columns=['DELs', 'DELs-Goodman', 'Damage', 'Damage-Goodman']))
+
+        # Now with the batch mode
+        dels3, dams3 = myobj.get_DELs()
+        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dels)}, dels3)
+        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dams)}, dams3)
+
+        dels4, dams4 = myobj.get_DELs(goodman=True)
+        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dels2)}, dels4)
+        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dams2)}, dams4)
+
+        
+    def test_process(self):
+        myobj = AeroelasticOutput(data, magnitude_channels=mc)
+        
+        stats = myobj.summary_stats()
+        ext_tab = myobj.extremes()
+        self.assertFalse(hasattr(myobj, 'stats'))
+
+        myobj.process()
+        self.assertTrue(hasattr(myobj, 'stats'))
+        self.assertEqual(myobj.stats, stats)
+        self.assertEqual(myobj.ext_table["Time"], ext_tab["Time"])
         
 if __name__ == "__main__":
     unittest.main()

@@ -6,11 +6,11 @@ from .utility import weibull_mean, rayleigh_mean
 
     
 class Crunch:
-    """Implementation of `mlife` in python."""
+    """Aeroelastic time-series simulation batch postprocessing class."""
 
     def __init__(self, outputs=[], **kwargs):
         """
-        Creates an instance of `pyLife`.
+        Creates an instance of `Crunch`.
 
         Parameters
         ----------
@@ -50,6 +50,9 @@ class Crunch:
         
         self.ec = kwargs.get("extreme_channels", [])
         self.fc = kwargs.get("fatigue_channels", {})
+        for k in range(self.noutputs):
+            self.outputs[k].fc = self.fc
+            self.outputs[k].ec = self.ec
         
         self.prob = kwargs.get("probability", np.array([]))
         if self.prob.size == 0:
@@ -120,21 +123,15 @@ class Crunch:
         f : str | AerolelasticOutput
             Path to output or direct output in dict format.
         """
-
-        # Data manipulation list all other outputs
-        output.trim_data(*self.td)
-        output.append_magnitude_channels(self.mc)
         
-        stats = output.summary_stats()
+        if not hasattr(output, 'stats'):
+            output.trim_data(*self.td)
+            output.append_magnitude_channels(self.mc)
+            output.fc.update(self.fc)
+            output.ec = self.ec
+            output.process(**kwargs)
 
-        if isinstance(self.ec, list) and len(self.ec) > 0:
-            extremes = output.extremes(self.ec)
-        else:
-            extremes = output.extremes()
-
-        dels, damage = self.get_DELs(output, **kwargs)
-
-        return output.filename, stats, extremes, dels, damage
+        return output.filename, output.stats, output.ext_table, output.dels, output.damage
 
 
     def add_output(self, output, **kwargs):
@@ -146,19 +143,15 @@ class Crunch:
         output : AerolelasticOutput
         """
         
-        # Data manipulation list all other outputs
-        output.trim_data(*self.td)
-        output.append_magnitude_channels(self.mc)
-        
-        # Add the output to our lists and increment counters
-        if not self.lean_flag:
-            self.outputs.append(output)
-
         # Analyze the data
         fname, stats, extremes, dels, damage =  self.process_single(output, **kwargs)
 
         # Add to output stat containers
         self.add_output_stats(fname, stats, extremes, dels, damage)
+
+        # Add the output to our lists
+        if not self.lean_flag:
+            self.outputs.append(output)
 
         
     def add_output_stats(self, fname, stats, extremes, dels, damage):
@@ -181,53 +174,6 @@ class Crunch:
         # Increment counters
         self.noutputs += 1
         self._reset_probabilities()
-
-        
-    def get_DELs(self, output, **kwargs):
-        """
-        Appends computed damage equivalent loads for fatigue channels in
-        `self.fc`.
-
-        Parameters
-        ----------
-        output : AerolelasticOutput
-        rainflow_bins : int (optional)
-            Number of bins used in rainflow analysis.
-            Default: 100
-        goodman_correction: boolean (optional)
-            Whether to apply Goodman mean correction to loads and stress
-            Default: False
-        return_damage: boolean (optional)
-            Whether to compute both DEL and damage
-            Default: False
-        """
-        for k in kwargs:
-            if k not in ["rainflow_bins", "return_damage", "compute_damage", "goodman_correction", "goodman"]:
-                print(f"Unknown keyword argument, {k}")
-            
-
-        DELs = {}
-        D = {}
-
-        for chan, fatparams in self.fc.items():
-            goodman = kwargs.get("goodman_correction", fatparams.goodman)
-            goodman = kwargs.get("goodman", goodman)
-            bins = kwargs.get("rainflow_bins", fatparams.bins)
-            return_damage = kwargs.get("return_damage", fatparams.return_damage)
-            return_damage = kwargs.get("compute_damage", return_damage)
-                
-            try:
-                DELs[chan], D[chan] = output.compute_del(chan, fatparams,
-                                                         goodman_correction=goodman,
-                                                         rainflow_bins=bins,
-                                                         return_damage=return_damage)
-
-            except IndexError:
-                print(f"Channel '{chan}' not included in DEL calculation.")
-                DELs[chan] = np.nan
-                D[chan] = np.nan
-
-        return DELs, D
 
 
     def _process_summary_stats(self, statsin):
@@ -296,14 +242,11 @@ class Crunch:
                     res = (*summary_stats.loc[col][stat].idxmin(), stat,
                            summary_stats.loc[col][stat].min())
 
-                elif stat == "mean":
+                elif stat in ["mean", "std"]:
                     res = ("NA", var, stat, summary_stats.loc[col][stat].mean())
 
                 elif stat == "median":
                     res = ("NA", var, stat, summary_stats.loc[col][stat].median())
-
-                elif stat == "std":
-                    res = ("NA", var, stat, summary_stats.loc[col][stat].std())
 
                 else:
                     raise NotImplementedError(f"Statistic '{stat}' not supported for load ranking.")
@@ -575,6 +518,10 @@ class Crunch:
         self.drop_channel(pattern)
     def remove_channel(self, pattern):
         self.drop_channel(pattern)
+            
+    def add_gradient_channels(self, chanstr, new_name):
+        for k in self.outputs:
+            k.add_gradient_channel(chanstr, new_name)
         
     def num_timesteps(self):
         return [m.num_timesteps for m in self.outputs]
@@ -678,6 +625,9 @@ class Crunch:
             return self.summary_stats[pwrchan]['integrated']
         else:
             return np.array( [m.compute_energy(pwrchan) for m in self.outputs] )
+        
+    def total_travel(self, chanstr):
+        return np.array( [m.total_travel(chanstr) for m in self.outputs] )
         
     def time_averaging(self, time_window):
         for m in self.outputs:

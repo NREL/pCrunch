@@ -353,6 +353,7 @@ class Test_Crunch(unittest.TestCase):
         npt.assert_equal(np.array(myobj.kurtosis()).shape, (10,myobj.num_channels()[0]))
         npt.assert_equal(np.array(myobj.integrated()).shape, (10,myobj.num_channels()[0]))
         npt.assert_equal(np.array(myobj.compute_energy('WindVxi')), myobj.integrated()[0][1])
+        npt.assert_equal(np.array(myobj.total_travel('WindVxi')), np.ones(10))
 
         # Can only do some stats without the output list
         myobj = Crunch(myouts, magnitude_channels=mc, lean=True)

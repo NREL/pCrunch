@@ -20,7 +20,34 @@ class AeroelasticOutput:
     """Base timeseries aeroelastic simulation data output class."""
 
     def __init__(self, datain=None, channelsin=None, **kwargs):
-        # Initialize all properties
+        """
+        Creates an instance of `AeroelasticOutput`.
+
+        Parameters
+        ----------
+        data : list
+            List of OpenFAST output filepaths or dicts of OpenFAST outputs.
+        channels : list (optional)
+            List of OpenFAST output filepaths or dicts of OpenFAST outputs.
+        units : list (optional)
+            List of OpenFAST output filepaths or dicts of OpenFAST outputs.
+        name : list (optional)
+            List of OpenFAST output filepaths or dicts of OpenFAST outputs.
+        description : list (optional)
+            List of OpenFAST output filepaths or dicts of OpenFAST outputs.
+        fatigue_channels : dict (optional)
+            Dictionary with format:
+            'channel': 'fatigue slope'
+        extreme_channels : list (optional)
+            Limit calculation of extremes to the channel names in the list.  Unspecified means all channels are processed and reported.
+        magnitude_channels : dict (optional)
+            Additional channels as vector magnitude of other channels.
+            Format: 'new-chan': ['chan1', 'chan2', 'chan3']
+        trim_data : tuple or list (optional)
+            Trim processed outputs to desired times.
+            Format: (min, max)
+        """
+
         self.data        = None
         self.channels    = None
         self.description = kwargs.get("description", "")
@@ -34,8 +61,15 @@ class AeroelasticOutput:
 
         self.set_data(datain, channelsin)
 
-        self.append_magnitude_channels( kwargs.get("magnitude_channels", None) )
+        self.td = kwargs.get("trim_data", ())
+        self.trim_data(*self.td)
+        
+        self.mc = kwargs.get("magnitude_channels", {})
+        self.append_magnitude_channels()
 
+        self.ec = kwargs.get("extreme_channels", [])
+        self.fc = kwargs.get("fatigue_channels", {})
+        
     def __getitem__(self, chan):
         return self.data[:, self.chan_idx(chan)]
 
@@ -46,6 +80,12 @@ class AeroelasticOutput:
         return AeroelasticOutput(self.data, self.channels, description=self.description,
                                  units=self.units, name=self.filepath)
 
+    def save(self, fname):
+        self.to_df().to_pickle(fname)
+
+    def load(self, fname):
+        self.set_data( pd.read_pickle(fname) )
+        
     def chan_idx(self, chan):
         try:
             idx = self.channels.index(chan)
@@ -216,6 +256,10 @@ class AeroelasticOutput:
             )
 
         self.data = self.data[idx,:]
+
+    def add_gradient_channel(self, chanstr, new_name):
+        newdata = np.gradient(self[chanstr], self.time)
+        self._add_channel(newdata, new_name)
         
     def append_magnitude_channels(self, magnitude_channels=None):
         """
@@ -227,13 +271,16 @@ class AeroelasticOutput:
             Format: 'new-chan' ['chan1', 'chan2', 'chan3'],
         """
 
-        if magnitude_channels is None:
-            return
-        else:
+        if magnitude_channels is not None:
             if not isinstance(magnitude_channels, dict):
                 raise ValueError("Expecting magnitude channels as a dictionary, 'new-chan': ['chan1', 'chan2', 'chan3']")
+            
+            self.mc.update( magnitude_channels)
         
-        for new_chan, chans in magnitude_channels.items():
+        if self.mc is None:
+            return
+        
+        for new_chan, chans in self.mc.items():
 
             try:
                 arrays = np.array([self[a] for a in chans]).T
@@ -378,6 +425,10 @@ class AeroelasticOutput:
 
     def compute_energy(self, pwrchan):
         return np.trapz(self[pwrchan], self.time)
+
+    def total_travel(self, chanstr):
+        dchan = np.gradient(self[chanstr], self.time)
+        return np.trapz(np.abs(dchan), self.time)
     
     def psd(self):
         """
@@ -605,4 +656,75 @@ class AeroelasticOutput:
 
         return DEL, D
 
+
+        
+    def get_DELs(self, **kwargs):
+        """
+        Appends computed damage equivalent loads for fatigue channels in
+        `self.fc`.
+
+        Parameters
+        ----------
+        output : AerolelasticOutput
+        rainflow_bins : int (optional)
+            Number of bins used in rainflow analysis.
+            Default: 100
+        goodman_correction: boolean (optional)
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        return_damage: boolean (optional)
+            Whether to compute both DEL and damage
+            Default: False
+        """
+        for k in kwargs:
+            if k not in ["rainflow_bins", "return_damage", "compute_damage", "goodman_correction", "goodman"]:
+                print(f"Unknown keyword argument, {k}")
+            
+
+        DELs = {}
+        D = {}
+
+        for chan, fatparams in self.fc.items():
+            goodman = kwargs.get("goodman_correction", fatparams.goodman)
+            goodman = kwargs.get("goodman", goodman)
+            bins = kwargs.get("rainflow_bins", fatparams.bins)
+            return_damage = kwargs.get("return_damage", fatparams.return_damage)
+            return_damage = kwargs.get("compute_damage", return_damage)
+                
+            try:
+                DELs[chan], D[chan] = self.compute_del(chan, fatparams,
+                                                       goodman_correction=goodman,
+                                                       rainflow_bins=bins,
+                                                       return_damage=return_damage)
+
+            except IndexError:
+                print(f"Channel '{chan}' not included in DEL calculation.")
+                DELs[chan] = np.nan
+                D[chan] = np.nan
+
+        return DELs, D
+
+    
+    def process(self, **kwargs):
+        """
+        Process AeroelasticOutput output `f`.
+
+        Parameters
+        ----------
+        f : str | AerolelasticOutput
+            Path to output or direct output in dict format.
+        """
+
+        # Data manipulation list all other outputs
+        self.trim_data(*self.td)
+        self.append_magnitude_channels(self.mc)
+        
+        self.stats = self.summary_stats()
+
+        if isinstance(self.ec, list) and len(self.ec) > 0:
+            self.ext_table = self.extremes(self.ec)
+        else:
+            self.ext_table = self.extremes()
+
+        self.dels, self.damage = self.get_DELs(**kwargs)
 
