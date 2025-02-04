@@ -1,8 +1,8 @@
 # pCrunch's Aeroelastic Output class
 
-The `AeroelasticOutput` class is a general container for time-series based data for a single environmental condition (i.e., a single incoming wind spead and turbulence seed value).  This might be a single run of your aeroelastic multibody simulation tool (OpenFAST or HAWC2 or Bladed or QBlade or in-house equivalents) in a larger parametric variation for design load case (DLC) analysis.  The `AeroelasticOutput` class provides data containers and common or convenient manipulations of the data for engineering analysis.
+The `AeroelasticOutput` class is a general container for time-series based data for a single environmental condition (i.e., a single incoming wind spead and turbulence seed value).  This might be a single run of your aeroelastic multibody simulation tool (OpenFAST or HAWC2 or Bladed or QBlade or in-house equivalents) in a larger parametric variation for design load case (DLC) analysis.  The `AeroelasticOutput` class provides data containers and common or convenient manipulations of the data for engineering analysis.  
 
-Analysis that involve multiple time-series simulations, such as a full run of multiple wind speeds and seeds, which yield multiple `AeroelasticOutput` instances, is done in the `Crunch` class.
+Analysis that involve multiple time-series simulations, such as a full run of multiple wind speeds and seeds, which yield multiple AeroelasticOutput instances, is done in the *Crunch class*.
 
 This file lays out some workflows and showcases capabilities of the `AeroelasticOutput` class.
 
@@ -57,6 +57,28 @@ Additional, optional arguments can also be passed that specify a label, a descri
 ```python
 myunits = ['s', 'm/s', 'm/s', 'm/s']
 myobj_from_dict = AeroelasticOutput(mydata, name='pseudodata', description='pCrunch example', units=myunits)
+```
+
+Magnitude channels, extremes, and fatigue are presented in greater detail below.  These additional inputs can also be specified in the constructor:
+
+
+```python
+# Vector magnitudes
+mc = {"Wind": ["WindVxi", "WindVyi", "WindVzi"]}
+
+# Channel-specific fatigue properties
+fc = {
+    "RootMc1": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8, load2stress=250.0, S_intercept=5e9),
+    "RootMc2": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8, load2stress=250.0, S_intercept=5e9),
+    "RootMc3": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8, load2stress=250.0, S_intercept=5e9),
+}
+
+# Channels to focus on for extreme event tabulation
+ec = ["RotSpeed", "RotThrust", "RotTorq"]
+
+# Can also add some batch data operations in the constructor (many more available in Batch Processing below)
+myobj_mc = AeroelasticOutput(mydata, magnitude_channels=mc, trim_data=[2, 8], fatigue_channels=fc, extreme_channels=ec)
+
 ```
 
 ## Data structures and access
@@ -546,7 +568,7 @@ myobj_from_dict.to_df()
 
 
 
-Channels can also be dropped using string wildcards
+Channels can also be dropped using string wildcards (`dop_channel`, `remove_channel`, and `delete_channel` are all valid)
 
 
 ```python
@@ -636,6 +658,118 @@ myobj_from_dict.to_df()
       <th>9</th>
       <td>10.0</td>
       <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+### Derivatives with respect to time
+
+As a common operation, new channels can be added that are gradients of existing channels.  This uses the Numpy `gradient` method with double precision central differencing in the middle of the timeseries and one-sided differencing at the edges.
+
+
+```python
+myobj_from_dict.add_gradient_channel('WindVxi','du_dt')
+myobj_from_dict.to_df()
+```
+
+
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Time</th>
+      <th>WindVxi</th>
+      <th>WindVyi</th>
+      <th>WindVzi</th>
+      <th>du_dt</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>1.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>3.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>4.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>5.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.5</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>6.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.5</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>7.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>8.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>9.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>10.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
     </tr>
@@ -1273,7 +1407,7 @@ myobj_from_df.stddevs
 myobj_from_df.skews
 ```
 
-    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:363: RuntimeWarning: invalid value encountered in divide
+    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:416: RuntimeWarning: invalid value encountered in divide
       return self.third_moments / np.sqrt(self.second_moments) ** 3
 
 
@@ -1290,7 +1424,7 @@ myobj_from_df.skews
 myobj_from_df.kurtosis
 ```
 
-    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:367: RuntimeWarning: invalid value encountered in divide
+    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:420: RuntimeWarning: invalid value encountered in divide
       return self.fourth_moments / self.second_moments ** 2
 
 
@@ -1325,6 +1459,19 @@ myobj_of_ascii.compute_energy('GenPwr')
 
 
     72637.25
+
+
+
+
+```python
+# Total "travel" during a simulation, which is helpful for pitch and yaw systems
+myobj_of_ascii.total_travel('BldPitch1') 
+```
+
+
+
+
+    89.99999999999991
 
 
 
@@ -1364,23 +1511,20 @@ mydata = {"Time":t,
 mymagnitudes = {"Mag0":["Signal0", "Zeros"],
                 "Mag80":["Signal80", "Zeros"]}
 
-# Create the instance
-myobj = AeroelasticOutput(mydata, magnitude_channels=mymagnitudes)
-
 # The channels we will be computing fatigue on
 myfatigues = {"Signal0":myparam,
               "Signal80":myparam,
               "Mag0":myparam,
               "Mag80":myparam}
 
+# Create the instance
+myobj = AeroelasticOutput(mydata, magnitude_channels=mymagnitudes, fatigue_channels=myfatigues)
+
 # Loop over channels and pass in channel-specific fatigue parameters
-dels = np.zeros(len(myfatigues))
-dams = np.zeros(len(myfatigues))
-for ik, k in enumerate(myfatigues.keys()):
-    dels[ik], dams[ik] = myobj.compute_del(k, myfatigues[k])
+dels, dams = myobj.get_DELs()
 
 # Organize the output into a table
-pd.DataFrame(np.c_[dels, dams], index=myfatigues.keys(), columns=['DELs', 'Damage'])
+pd.concat((pd.DataFrame(dels, index=['DELs']), pd.DataFrame(dams, index=['Damage'])))
 ```
 
 
@@ -1391,29 +1535,25 @@ pd.DataFrame(np.c_[dels, dams], index=myfatigues.keys(), columns=['DELs', 'Damag
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>DELs</th>
-      <th>Damage</th>
+      <th>Signal0</th>
+      <th>Signal80</th>
+      <th>Mag0</th>
+      <th>Mag80</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>Signal0</th>
+      <th>DELs</th>
       <td>40869.837167</td>
-      <td>0.008073</td>
-    </tr>
-    <tr>
-      <th>Signal80</th>
       <td>40869.837167</td>
-      <td>0.008073</td>
-    </tr>
-    <tr>
-      <th>Mag0</th>
       <td>25746.384881</td>
-      <td>0.002018</td>
+      <td>40869.837167</td>
     </tr>
     <tr>
-      <th>Mag80</th>
-      <td>40869.837167</td>
+      <th>Damage</th>
+      <td>0.008073</td>
+      <td>0.008073</td>
+      <td>0.002018</td>
       <td>0.008073</td>
     </tr>
   </tbody>
@@ -1432,12 +1572,9 @@ Now let's add the Goodman Correction, which should calculate additional fatigue 
 
 
 ```python
-dels2 = np.zeros(len(myfatigues))
-dams2 = np.zeros(len(myfatigues))
-for ik, k in enumerate(myfatigues.keys()):
-    dels2[ik], dams2[ik] = myobj.compute_del(k, myfatigues[k], goodman_correction=True)
-    
-pd.DataFrame(np.c_[dels, dels2, dams, dams2], index=myfatigues.keys(), columns=['DELs', 'DELs-Goodman', 'Damage', 'Damage-Goodman'])
+dels2, dams2 = myobj.get_DELs(goodman=True)
+
+pd.concat((pd.DataFrame(dels, index=['DELs']), pd.DataFrame(dels2, index=['DELs-Goodman']), pd.DataFrame(dams, index=['Damage']), pd.DataFrame(dams2, index=['Damage-Goodman'])))    
 ```
 
 
@@ -1448,39 +1585,39 @@ pd.DataFrame(np.c_[dels, dels2, dams, dams2], index=myfatigues.keys(), columns=[
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>DELs</th>
-      <th>DELs-Goodman</th>
-      <th>Damage</th>
-      <th>Damage-Goodman</th>
+      <th>Signal0</th>
+      <th>Signal80</th>
+      <th>Mag0</th>
+      <th>Mag80</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>Signal0</th>
+      <th>DELs</th>
       <td>40869.837167</td>
       <td>40869.837167</td>
+      <td>25746.384881</td>
+      <td>40869.837167</td>
+    </tr>
+    <tr>
+      <th>DELs-Goodman</th>
+      <td>40869.837167</td>
+      <td>41006.525582</td>
+      <td>25789.367156</td>
+      <td>41006.525582</td>
+    </tr>
+    <tr>
+      <th>Damage</th>
       <td>0.008073</td>
+      <td>0.008073</td>
+      <td>0.002018</td>
       <td>0.008073</td>
     </tr>
     <tr>
-      <th>Signal80</th>
-      <td>40869.837167</td>
-      <td>41006.525582</td>
+      <th>Damage-Goodman</th>
       <td>0.008073</td>
       <td>0.008154</td>
-    </tr>
-    <tr>
-      <th>Mag0</th>
-      <td>25746.384881</td>
-      <td>25789.367156</td>
-      <td>0.002018</td>
       <td>0.002028</td>
-    </tr>
-    <tr>
-      <th>Mag80</th>
-      <td>40869.837167</td>
-      <td>41006.525582</td>
-      <td>0.008073</td>
       <td>0.008154</td>
     </tr>
   </tbody>
@@ -1490,3 +1627,117 @@ pd.DataFrame(np.c_[dels, dels2, dams, dams2], index=myfatigues.keys(), columns=[
 
 
 As expected, there is now a difference between Signal0 and Signal80 in the Goodman columns because of the higher mean loads in the Signal80 case.
+
+## Saving and Loading Data
+
+The timeseries and channel data can be saved and loaded from a file.  The supporting data structures, such as `magnitude_channels` or `fatigue_channels` are not saved or loaded (yet).
+
+
+```python
+myobj_from_dict.save('myfile.p')
+myobj_copy = AeroelasticOutput()
+myobj_copy.load('myfile.p')
+myobj_copy.to_df()
+```
+
+
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>Time</th>
+      <th>WindVxi</th>
+      <th>WindVyi</th>
+      <th>WindVzi</th>
+      <th>du_dt</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>1.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>3.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>4.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>5.0</td>
+      <td>7.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.5</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>6.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.5</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>7.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>8.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>9.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>10.0</td>
+      <td>8.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+

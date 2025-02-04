@@ -128,7 +128,7 @@ class Crunch:
             output.trim_data(*self.td)
             output.append_magnitude_channels(self.mc)
             output.fc.update(self.fc)
-            output.ec = self.ec
+            output.ec = list(set(output.ec + self.ec))
             output.process(**kwargs)
 
         return output.filename, output.stats, output.ext_table, output.dels, output.damage

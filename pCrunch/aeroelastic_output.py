@@ -540,10 +540,18 @@ class AeroelasticOutput:
         return fstats
 
     
-    def extremes(self, channels=None):
+    def extremes(self, chanlist=None):
         """"""
-        if channels is None:
+        if chanlist is not None:
+            if not isinstance(chanlist, [list, set, tuple]):
+                raise ValueError("Expecting extreme channels as a list, tuple, or set")
+            
+            self.ec = list(set(self.ec + chanlist))
+        
+        if self.ec is None or len(self.ec) == 0:
             channels = self.channels
+        else:
+            channels = self.ec
             
         sorter = np.argsort(self.channels)
         exists = [c for c in channels if c in self.channels]
@@ -707,12 +715,7 @@ class AeroelasticOutput:
     
     def process(self, **kwargs):
         """
-        Process AeroelasticOutput output `f`.
-
-        Parameters
-        ----------
-        f : str | AerolelasticOutput
-            Path to output or direct output in dict format.
+        Process AeroelasticOutput output for summary stats, extreme event table, DELs, and Damage
         """
 
         # Data manipulation list all other outputs
@@ -721,10 +724,7 @@ class AeroelasticOutput:
         
         self.stats = self.summary_stats()
 
-        if isinstance(self.ec, list) and len(self.ec) > 0:
-            self.ext_table = self.extremes(self.ec)
-        else:
-            self.ext_table = self.extremes()
+        self.ext_table = self.extremes()
 
         self.dels, self.damage = self.get_DELs(**kwargs)
 

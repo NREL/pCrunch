@@ -45,11 +45,7 @@ fc = {
 }
 
 # Channels to focus on for extreme event tabulation
-ec = [
-    "RotSpeed",
-    "RotThrust",
-    "RotTorq",
-]
+ec = ["RotSpeed", "RotThrust", "RotTorq"]
 
 # Standard use case with all outputs read prior to use of Crunch.
 mycruncher = Crunch(outputs)
@@ -85,6 +81,7 @@ mycruncher_mc.process_outputs(return_damage=True)
 The key outputs that are stacked together for each output are:
 
 - Summary statistics
+- Load ranking
 - Extreme event table
 - Damage equivalent loads (DELs)
 - Palmgren-Miner damage
@@ -331,6 +328,41 @@ mycruncher.summary_stats.loc["DLC2.3_1.out"]
 
 
 ```python
+# Load rankings are manipulations of the summary statistics table
+# All channels and statistics are available
+mycruncher.get_load_rankings(['RootMc1'],['max'])
+```
+
+
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>file</th>
+      <th>channel</th>
+      <th>stat</th>
+      <th>val</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>DLC2.3_1.out</td>
+      <td>RootMc1</td>
+      <td>max</td>
+      <td>9134.167593</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```python
 # Damage equivalent loads are found here:
 mycruncher_mc.dels
 ```
@@ -375,7 +407,7 @@ mycruncher_mc.dels
 
 
 ```python
-# Palmgren-Miner damage can be viewed with:
+# Palmgren-Miner damage can be viewed with (although it is not computed without a `return_damage=True`
 mycruncher_mc.damage
 ```
 
@@ -395,21 +427,21 @@ mycruncher_mc.damage
   <tbody>
     <tr>
       <th>DLC2.3_1.out</th>
-      <td>9.208221e-31</td>
-      <td>3.327773e-27</td>
-      <td>1.146698e-31</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>DLC2.3_2.out</th>
-      <td>1.972404e-30</td>
-      <td>3.504854e-28</td>
-      <td>1.537632e-31</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>DLC2.3_3.out</th>
-      <td>2.211880e-30</td>
-      <td>3.552505e-27</td>
-      <td>2.174332e-31</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
   </tbody>
 </table>
@@ -420,7 +452,7 @@ mycruncher_mc.damage
 
 ```python
 # Extreme events table. For each channel, there is a list of the extreme condition for each output case
-mycruncher_mc.extremes
+mycruncher.extremes
 ```
 
 
@@ -428,22 +460,22 @@ mycruncher_mc.extremes
 
     {'RotSpeed': [{'Time': 61.8,
        'RotSpeed': 11.1,
-       'RotThrust': 369.0,
-       'RotTorq': 844.0},
-      {'Time': 61.9, 'RotSpeed': 11.28, 'RotThrust': 367.0, 'RotTorq': 159.4},
-      {'Time': 61.9, 'RotSpeed': 11.33, 'RotThrust': 317.0, 'RotTorq': 140.8}],
-     'RotThrust': [{'Time': 51.6,
-       'RotSpeed': 10.1,
-       'RotThrust': 759.0,
-       'RotTorq': 2410.0},
-      {'Time': 60.35, 'RotSpeed': 10.41, 'RotThrust': 786.9, 'RotTorq': -1041.0},
-      {'Time': 60.35, 'RotSpeed': 10.48, 'RotThrust': 746.2, 'RotTorq': -1046.0}],
+       'RotTorq': 844.0,
+       'RotThrust': 369.0},
+      {'Time': 61.9, 'RotSpeed': 11.28, 'RotTorq': 159.4, 'RotThrust': 367.0},
+      {'Time': 61.9, 'RotSpeed': 11.33, 'RotTorq': 140.8, 'RotThrust': 317.0}],
      'RotTorq': [{'Time': 54.45,
        'RotSpeed': 10.6,
-       'RotThrust': 546.0,
-       'RotTorq': 2650.0},
-      {'Time': 54.4, 'RotSpeed': 10.74, 'RotThrust': 554.0, 'RotTorq': 2701.0},
-      {'Time': 54.4, 'RotSpeed': 10.61, 'RotThrust': 575.1, 'RotTorq': 2638.0}]}
+       'RotTorq': 2650.0,
+       'RotThrust': 546.0},
+      {'Time': 54.4, 'RotSpeed': 10.74, 'RotTorq': 2701.0, 'RotThrust': 554.0},
+      {'Time': 54.4, 'RotSpeed': 10.61, 'RotTorq': 2638.0, 'RotThrust': 575.1}],
+     'RotThrust': [{'Time': 51.6,
+       'RotSpeed': 10.1,
+       'RotTorq': 2410.0,
+       'RotThrust': 759.0},
+      {'Time': 60.35, 'RotSpeed': 10.41, 'RotTorq': -1041.0, 'RotThrust': 786.9},
+      {'Time': 60.35, 'RotSpeed': 10.48, 'RotTorq': -1046.0, 'RotThrust': 746.2}]}
 
 
 
@@ -457,8 +489,7 @@ If operating in "lean / streaming" mode, the outputs can either be processed one
 for iout in outputs:
     mycruncher_lean.add_output( iout ) # Each output is processed without retaining the full time series
 
-# Adding statistics incrementally, which is especially helpful when using parallel processing
-# and finaly assembly of the full pool of outputs can still strain memory resources
+# Adding statistics incrementally
 results_pool = []
 for iout in outputs:
     iresults = mycruncher_lean_mc.process_single( iout ) # This could be the result of parallelized function
@@ -652,15 +683,15 @@ dams_tot
   <tbody>
     <tr>
       <th>Weighted</th>
-      <td>1.701702e-30</td>
-      <td>2.410254e-27</td>
-      <td>1.619554e-31</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
     </tr>
     <tr>
       <th>Unweighted</th>
-      <td>1.701702e-30</td>
-      <td>2.410254e-27</td>
-      <td>1.619554e-31</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
     </tr>
   </tbody>
 </table>
@@ -1984,7 +2015,7 @@ mycruncher.stddevs()
 mycruncher.skews()
 ```
 
-    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:369: RuntimeWarning: invalid value encountered in divide
+    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:416: RuntimeWarning: invalid value encountered in divide
       return self.third_moments / np.sqrt(self.second_moments) ** 3
 
 
@@ -2024,7 +2055,7 @@ mycruncher.skews()
 mycruncher.kurtosis()
 ```
 
-    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:373: RuntimeWarning: invalid value encountered in divide
+    /Users/gbarter/devel/pCrunch/pCrunch/aeroelastic_output.py:420: RuntimeWarning: invalid value encountered in divide
       return self.fourth_moments / self.second_moments ** 2
 
 
@@ -2222,5 +2253,18 @@ mycruncher.compute_energy('GenPwr')
     DLC2.3_2.out    51033.000
     DLC2.3_3.out    50520.175
     Name: integrated, dtype: float64
+
+
+
+
+```python
+# Total travel across simulation- useful for pitch drives and yaw drivers
+mycruncher.total_travel('BldPitch1')
+```
+
+
+
+
+    array([90., 90., 90.])
 
 
