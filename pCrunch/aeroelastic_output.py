@@ -543,7 +543,7 @@ class AeroelasticOutput:
     def extremes(self, chanlist=None):
         """"""
         if chanlist is not None:
-            if not isinstance(chanlist, [list, set, tuple]):
+            if not isinstance(chanlist, (list, set, tuple)):
                 raise ValueError("Expecting extreme channels as a list, tuple, or set")
             
             self.ec = list(set(self.ec + chanlist))
