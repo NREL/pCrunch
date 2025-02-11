@@ -39,7 +39,8 @@ class AeroelasticOutput:
             Dictionary with format:
             'channel': 'fatigue slope'
         extreme_channels : list (optional)
-            Limit calculation of extremes to the channel names in the list.  Unspecified means all channels are processed and reported.
+            Limit calculation of extremes to the channel names in the list.
+            Unspecified means all channels are processed and reported.
         magnitude_channels : dict (optional)
             Additional channels as vector magnitude of other channels.
             Format: 'new-chan': ['chan1', 'chan2', 'chan3']
