@@ -38,6 +38,9 @@ class AeroelasticOutput:
         fatigue_channels : dict (optional)
             Dictionary with format:
             'channel': 'fatigue slope'
+        extreme_stat : str (optional)
+            Whether the extreme event calculation should work on [max, min, abs].
+            Default, 'max'
         extreme_channels : list (optional)
             Limit calculation of extremes to the channel names in the list.
             Unspecified means all channels are processed and reported.
@@ -69,6 +72,9 @@ class AeroelasticOutput:
         self.append_magnitude_channels()
 
         self.ec = kwargs.get("extreme_channels", [])
+        statin  = kwargs.get("extreme_stat", "max")
+        self.set_extreme_stat(statin)
+        
         self.fc = kwargs.get("fatigue_channels", {})
         
     def __getitem__(self, chan):
@@ -86,6 +92,16 @@ class AeroelasticOutput:
 
     def load(self, fname):
         self.set_data( pd.read_pickle(fname) )
+
+    def set_extreme_stat(self, instr):
+        if instr is None or instr == '':
+            return
+        
+        if (not isinstance(instr, str) or
+            instr.lower() not in ['max','min','abs','absmax','maximum','minimum','maxima','minima','absolute','abs max']):
+            raise ValueError('Expecting stat to be a string of [max, min, abs]')
+        
+        self.extreme_stat = instr.lower()
         
     def chan_idx(self, chan):
         try:
@@ -213,7 +229,10 @@ class AeroelasticOutput:
 
     @dataproperty
     def time(self):
-        return self["Time"]
+        if "Time" in self.channels:
+            return self["Time"]
+        else:
+            return self.data[:,0]
 
     @property
     def filename(self):
@@ -314,7 +333,8 @@ class AeroelasticOutput:
             if not isinstance(load_rose, dict):
                 raise ValueError("Expecting load rose channels as a dictionary, 'new-chan': ['chan_x', 'chan_y']")
 
-        thd = np.linspace(0, 360, nsec+1)[:-1] # Don't need to repeat the 360 mark
+        th_pts = np.linspace(0, 180, nsec+1) # Don't need to repeat the 360 mark
+        thd = 0.5*(th_pts[:-1] + th_pts[1:]) # Mid point of each sector
         
         for rootstr, chans in load_rose.items():
             for td in thd:
@@ -347,6 +367,10 @@ class AeroelasticOutput:
     @dataproperty
     def idxmaxs(self):
         return self.data.argmax(axis=0)
+
+    @dataproperty
+    def idxabs(self):
+        return np.abs(self.data).argmax(axis=0)
 
     @dataproperty
     def minima(self):
@@ -430,8 +454,14 @@ class AeroelasticOutput:
     def total_travel(self, chanstr):
         dchan = np.gradient(self[chanstr], self.time)
         return np.trapz(np.abs(dchan), self.time)
+
+    def histogram(self, chanstr, bins=15):
+        return np.histogram(self[chanstr], bins=bins, density=False)
     
-    def psd(self):
+    def density(self, chanstr, bins=15):
+        return np.histogram(self[chanstr], bins=bins, density=True)
+    
+    def psd(self, nfft=None):
         """
         Compute power spectra density for each channel.
 
@@ -443,7 +473,7 @@ class AeroelasticOutput:
             Power spectral density with each column corresponding to a channel
         """
         fs = 1. / np.diff(self.time)[0]
-        freq, Pxx_den = signal.welch(self.data, fs, axis=0)
+        freq, Pxx_den = signal.welch(self.data, fs, nfft=nfft, axis=0)
         fobj = self.copy()
         fobj.data = Pxx_den
         fobj.data[:,0] = freq
@@ -476,6 +506,9 @@ class AeroelasticOutput:
 
         # Install the new data
         self.data = data_avg
+        
+    def averaging(self, window):
+        self.time_averaging(window)
 
     
     def time_binning(self, time_window):
@@ -509,7 +542,9 @@ class AeroelasticOutput:
 
         # Install the new data
         self.data = data_binned
-
+        
+    def binning(self, window):
+        self.time_binning(window)
 
     def summary_stats(self):
         """
@@ -541,7 +576,7 @@ class AeroelasticOutput:
         return fstats
 
     
-    def extremes(self, chanlist=None):
+    def extremes(self, chanlist=None, stat=None):
         """"""
         if chanlist is not None:
             if not isinstance(chanlist, (list, set, tuple)):
@@ -553,17 +588,26 @@ class AeroelasticOutput:
             channels = self.channels
         else:
             channels = self.ec
-            
+
         sorter = np.argsort(self.channels)
         exists = [c for c in channels if c in self.channels]
         idx = sorter[np.searchsorted(self.channels, exists, sorter=sorter)]
 
+        # Get statistic
+        self.set_extreme_stat(stat)
+        if self.extreme_stat.find('abs') >= 0:
+            mystat = self.idxabs
+        elif self.extreme_stat.find('min') >= 0:
+            mystat = self.idxmins
+        elif self.extreme_stat.find('max') >= 0:
+            mystat = self.idxmaxs
+        
         extremes = {}
         for chan, i in zip(exists, idx):
-            idx_max = self.idxmaxs[i]
+            idx_stat = mystat[i]
             extremes[chan] = {
-                "Time": self.time[idx_max],
-                **dict(zip(exists, self.data[idx_max, idx])),
+                "Time": self.time[idx_stat],
+                **dict(zip(exists, self.data[idx_stat, idx])),
             }
 
         return extremes

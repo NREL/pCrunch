@@ -50,6 +50,7 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, np.array([]))
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "max")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
@@ -65,6 +66,7 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, [1.0])
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "max")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
@@ -79,12 +81,13 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, [0.5, 0.5])
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "max")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
 
         # With trimming
-        myobj = Crunch([myout, myout], magnitude_channels=mc, trim_data=[3,6])
+        myobj = Crunch([myout, myout], magnitude_channels=mc, trim_data=[3,6], extreme_stat='abs')
         self.assertEqual(myobj.lean_flag, False)
         self.assertEqual(myobj.noutputs, 2)
         self.assertEqual(myobj.td, [3,6])
@@ -93,6 +96,7 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, [0.5, 0.5])
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "abs")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
@@ -243,31 +247,31 @@ class Test_Crunch(unittest.TestCase):
         myobj = Crunch(myouts, magnitude_channels=mc)
         myobj.process_outputs()
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='weibull')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='weibull')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='weibull', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='weibull', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='rayleigh')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='rayleigh')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='rayleigh', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='rayleigh', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='uniform')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='uniform')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='uniform', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='uniform', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='bleh')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='bleh')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='bleh', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='bleh', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution(np.r_[15*np.ones(9), 7.5], 7.5, kind='weibull')
+        myobj.set_probability_wind_distribution(np.r_[15*np.ones(9), 7.5], 7.5, kind='weibull')
         npt.assert_equal(myobj.prob[:-1], myobj.prob[0])
         self.assertGreater(myobj.prob[-1], myobj.prob[-2])
 

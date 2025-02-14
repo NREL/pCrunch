@@ -21,6 +21,9 @@ class Crunch:
         fatigue_channels : dict (optional)
             Dictionary with format:
             'channel': 'fatigue slope'
+        extreme_stat : str (optional)
+            Whether the extreme event calculation should work on [max, min, abs].
+            Default, 'max'
         extreme_channels : list (optional)
             Limit calculation of extremes to the channel names in the list.  Unspecified means all channels are processed and reported.
         magnitude_channels : dict (optional)
@@ -49,6 +52,8 @@ class Crunch:
         self.append_magnitude_channels(self.mc)
         
         self.ec = kwargs.get("extreme_channels", [])
+        self.extreme_stat = kwargs.get("extreme_stat", "max")
+        
         self.fc = kwargs.get("fatigue_channels", {})
         for k in range(self.noutputs):
             self.outputs[k].fc = self.fc
@@ -129,6 +134,7 @@ class Crunch:
             output.append_magnitude_channels(self.mc)
             output.fc.update(self.fc)
             output.ec = list(set(output.ec + self.ec))
+            output.set_extreme_stat(self.extreme_stat)
             output.process(**kwargs)
 
         return output.filename, output.stats, output.ext_table, output.dels, output.damage
@@ -303,7 +309,7 @@ class Crunch:
         if self.noutputs > 0:
             self.prob = np.ones( self.noutputs ) / float(self.noutputs)
             
-    def set_probability_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull", idx=None):
+    def set_probability_wind_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull", idx=None):
         """
         Sets the probability of each output in the list based on a Weibull or Rayleigh
         distribution for windspeed.
@@ -383,7 +389,7 @@ class Crunch:
         else:
             raise ValueError(f"Unknown turbine class, {turbine_class}")
 
-        self.set_probability_distribution(windspeed, Vavg, weibull_k=2.0, kind="weibull", idx=idx)
+        self.set_probability_wind_distribution(windspeed, Vavg, weibull_k=2.0, kind="weibull", idx=idx)
 
         
     def compute_aep(self, pwrchan, loss_factor=0.0, idx=None):
@@ -544,6 +550,9 @@ class Crunch:
     
     def idxmaxs(self):
         return np.array( [m.idxmaxs for m in self.outputs] )
+    
+    def idxabs(self):
+        return np.array( [m.idxabs for m in self.outputs] )
     
     def minima(self):
         if len(self.summary_stats) > 0:
