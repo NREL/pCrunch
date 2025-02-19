@@ -443,7 +443,7 @@ class Crunch:
         return aep_weighted, aep_unweighted
 
     
-    def compute_total_fatigue(self, idx=None):
+    def compute_total_fatigue(self, lifetime=0.0, idx=None):
         """
         Computes total damage equivalent load and total damage based on all
         outputs in the list.
@@ -483,17 +483,30 @@ class Crunch:
             dels_total = None
             
         if len(damage) > 0:
+            # Now weighted/unweighted of elapsed time
+            T = np.array( self.elapsed_time() )
+            
             if idx is not None and len(idx) > 0:
                damage = damage.iloc[idx]
+               T = T[idx]
                
             damage_weighted = np.sum(prob[:,np.newaxis] * damage, axis=0)
             damage_unweighted = damage.mean(axis=0)
+
+            T_weighted = np.dot(T, prob)
+            T_unweighted = T.mean()
             
-            damage_total = pd.DataFrame([damage_weighted, damage_unweighted],
-                                        index=['Weighted','Unweighted'])
+            # Now lifetime scaling of damage
+            damage_weighted_life = damage_weighted * lifetime *365.0*24.0*60.0*60.0 / T_weighted
+            damage_unweighted_life = damage_unweighted * lifetime *365.0*24.0*60.0*60.0 / T_unweighted
+
+            # Results in dataframe
+            damage_total = pd.DataFrame([damage_weighted, damage_unweighted, damage_weighted_life, damage_unweighted_life],
+                                        index=['Weighted','Unweighted','Lifetime Weighted','Lifetime Unweighted'])
         else:
             damage_total = None
-            
+
+        
         return dels_total, damage_total
 
         

@@ -613,103 +613,6 @@ class AeroelasticOutput:
         return extremes
 
 
-    def compute_del(self, chan, fatparams, **kwargs):
-        """
-        Computes damage equivalent load of input `chan`.
-
-        Parameters
-        ----------
-        chan : str or np.array
-            Channel name or time series to calculate DEL for.
-        fatparams : FatigueParameters object
-            Instance of FatigueParameters with all material and geometry parameters
-        lifetime : int | float (optional kwargs)
-            Design lifetime of the component / material in years. If specified, overrides fatparams value.
-        load2stress : float (optional kwargs)
-            Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
-            If specified, overrides fatparams value.
-        slope : int | float (optional kwargs)
-            Slope of the fatigue curve.  If specified, overrides fatparams value.
-        ultimate_stress : float (optional kwargs)
-            Ultimate stress for use in Goodman equivalent stress calculation.  If specified, overrides fatparams value.
-        S_intercept : float (optional kwargs)
-            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified.
-            If specified, overrides fatparams value.
-        rainflow_bins : int (optional kwargs)
-            Number of bins used in rainflow analysis.
-            Default: 100
-        goodman_correction: boolean (optional kwargs)
-            Whether to apply Goodman mean correction to loads and stress
-            Default: False
-        return_damage: boolean (optional kwargs)
-            Whether to compute both DEL and damage
-            Default: False
-        """
-
-        lifetime      = kwargs.get("lifetime", fatparams.lifetime)
-        load2stress   = kwargs.get("load2stress", fatparams.load2stress)
-        slope         = kwargs.get("slope", fatparams.slope)
-        Sult          = kwargs.get("ultimate_stress", fatparams.ult_stress)
-        Sc            = kwargs.get("S_intercept", fatparams.S_intercept)
-        Scin          = Sc if Sc > 0.0 else Sult
-        bins          = kwargs.get("rainflow_bins", fatparams.bins)
-        return_damage = kwargs.get("return_damage", fatparams.return_damage)
-        return_damage = kwargs.get("compute_damage", return_damage)
-        goodman       = kwargs.get("goodman_correction", fatparams.goodman)
-        goodman       = kwargs.get("goodman", goodman)
-        elapsed       = self.elapsed_time
-        if isinstance(chan, str):
-            chan = self[chan]
-
-        for k in kwargs:
-            if k not in ["lifetime", "load2stress", "slope", "ultimate_stress",
-                         "S_intercept", "rainflow_bins", "return_damage", "compute_damage",
-                         "goodman_correction", "goodman"]:
-                print(f"Unknown keyword argument, {k}")
-            
-        # Default return values
-        DEL = np.nan
-        D   = np.nan
-
-        if np.all(np.isnan(chan)):
-            return DEL, D
-
-        # Working with loads for DELs
-        try:
-            F, Fmean = fatpack.find_rainflow_ranges(chan, return_means=True)
-        except Exception:
-            F = Fmean = np.zeros(1)
-        if goodman and np.abs(load2stress) > 0.0:
-            F = fatpack.find_goodman_equivalent_stress(F, Fmean, Sult/np.abs(load2stress))
-        Nrf, Frf = fatpack.find_range_count(F, bins)
-        DELs = Frf ** slope * Nrf / elapsed
-        DEL = DELs.sum() ** (1.0 / slope)
-        # With fatpack do:
-        #curve = fatpack.LinearEnduranceCurve(1.)
-        #curve.m = slope
-        #curve.Nc = elapsed
-        #DEL = curve.find_miner_sum(np.c_[Frf, Nrf]) ** (1 / slope)
-
-        # Compute Palmgren/Miner damage using stress
-        D = np.nan # default return value
-        if return_damage and np.abs(load2stress) > 0.0:
-            try:
-                S, Mrf = fatpack.find_rainflow_ranges(chan*load2stress, return_means=True)
-            except Exception:
-                S = Mrf = np.zeros(1)
-            if goodman:
-                S = fatpack.find_goodman_equivalent_stress(S, Mrf, Sult)
-            Nrf, Srf = fatpack.find_range_count(S, bins)
-            curve = fatpack.LinearEnduranceCurve(Scin)
-            curve.m = slope
-            curve.Nc = 1
-            D = curve.find_miner_sum(np.c_[Srf, Nrf])
-            if lifetime > 0.0:
-                D *= lifetime*365.0*24.0*60.0*60.0 / elapsed
-
-        return DEL, D
-
-
         
     def get_DELs(self, **kwargs):
         """
@@ -730,9 +633,13 @@ class AeroelasticOutput:
             Default: False
         """
         for k in kwargs:
-            if k not in ["rainflow_bins", "return_damage", "compute_damage", "goodman_correction", "goodman"]:
+            if k not in ["rainflow_bins", "bins",
+                         "return_damage", "compute_damage",
+                         "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
-            
+
+        return_damage = kwargs.get("return_damage", False)
+        return_damage = kwargs.get("compute_damage", return_damage)
 
         DELs = {}
         D = {}
@@ -741,14 +648,16 @@ class AeroelasticOutput:
             goodman = kwargs.get("goodman_correction", fatparams.goodman)
             goodman = kwargs.get("goodman", goodman)
             bins = kwargs.get("rainflow_bins", fatparams.bins)
-            return_damage = kwargs.get("return_damage", fatparams.return_damage)
-            return_damage = kwargs.get("compute_damage", return_damage)
+            bins = kwargs.get("bins", bins)
                 
             try:
-                DELs[chan], D[chan] = self.compute_del(chan, fatparams,
+                DELs[chan] = fatparams.compute_del(self[chan], self.elapsed_time,
+                                                   goodman_correction=goodman,
+                                                   rainflow_bins=bins)
+                if return_damage:
+                    D[chan] = fatparams.compute_damage(self[chan],
                                                        goodman_correction=goodman,
-                                                       rainflow_bins=bins,
-                                                       return_damage=return_damage)
+                                                       rainflow_bins=bins)
 
             except IndexError:
                 print(f"Channel '{chan}' not included in DEL calculation.")
