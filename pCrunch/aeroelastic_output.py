@@ -38,8 +38,12 @@ class AeroelasticOutput:
         fatigue_channels : dict (optional)
             Dictionary with format:
             'channel': 'fatigue slope'
+        extreme_stat : str (optional)
+            Whether the extreme event calculation should work on [max, min, abs].
+            Default, 'max'
         extreme_channels : list (optional)
-            Limit calculation of extremes to the channel names in the list.  Unspecified means all channels are processed and reported.
+            Limit calculation of extremes to the channel names in the list.
+            Unspecified means all channels are processed and reported.
         magnitude_channels : dict (optional)
             Additional channels as vector magnitude of other channels.
             Format: 'new-chan': ['chan1', 'chan2', 'chan3']
@@ -68,6 +72,9 @@ class AeroelasticOutput:
         self.append_magnitude_channels()
 
         self.ec = kwargs.get("extreme_channels", [])
+        statin  = kwargs.get("extreme_stat", "max")
+        self.set_extreme_stat(statin)
+        
         self.fc = kwargs.get("fatigue_channels", {})
         
     def __getitem__(self, chan):
@@ -85,6 +92,16 @@ class AeroelasticOutput:
 
     def load(self, fname):
         self.set_data( pd.read_pickle(fname) )
+
+    def set_extreme_stat(self, instr):
+        if instr is None or instr == '':
+            return
+        
+        if (not isinstance(instr, str) or
+            instr.lower() not in ['max','min','abs','absmax','maximum','minimum','maxima','minima','absolute','abs max']):
+            raise ValueError('Expecting stat to be a string of [max, min, abs]')
+        
+        self.extreme_stat = instr.lower()
         
     def chan_idx(self, chan):
         try:
@@ -212,7 +229,10 @@ class AeroelasticOutput:
 
     @dataproperty
     def time(self):
-        return self["Time"]
+        if "Time" in self.channels:
+            return self["Time"]
+        else:
+            return self.data[:,0]
 
     @property
     def filename(self):
@@ -313,7 +333,8 @@ class AeroelasticOutput:
             if not isinstance(load_rose, dict):
                 raise ValueError("Expecting load rose channels as a dictionary, 'new-chan': ['chan_x', 'chan_y']")
 
-        thd = np.linspace(0, 360, nsec+1)[:-1] # Don't need to repeat the 360 mark
+        th_pts = np.linspace(0, 180, nsec+1) # Don't need to repeat the 360 mark
+        thd = 0.5*(th_pts[:-1] + th_pts[1:]) # Mid point of each sector
         
         for rootstr, chans in load_rose.items():
             for td in thd:
@@ -346,6 +367,10 @@ class AeroelasticOutput:
     @dataproperty
     def idxmaxs(self):
         return self.data.argmax(axis=0)
+
+    @dataproperty
+    def idxabs(self):
+        return np.abs(self.data).argmax(axis=0)
 
     @dataproperty
     def minima(self):
@@ -429,8 +454,14 @@ class AeroelasticOutput:
     def total_travel(self, chanstr):
         dchan = np.gradient(self[chanstr], self.time)
         return np.trapz(np.abs(dchan), self.time)
+
+    def histogram(self, chanstr, bins=15):
+        return np.histogram(self[chanstr], bins=bins, density=False)
     
-    def psd(self):
+    def density(self, chanstr, bins=15):
+        return np.histogram(self[chanstr], bins=bins, density=True)
+    
+    def psd(self, nfft=None):
         """
         Compute power spectra density for each channel.
 
@@ -442,7 +473,7 @@ class AeroelasticOutput:
             Power spectral density with each column corresponding to a channel
         """
         fs = 1. / np.diff(self.time)[0]
-        freq, Pxx_den = signal.welch(self.data, fs, axis=0)
+        freq, Pxx_den = signal.welch(self.data, fs, nfft=nfft, axis=0)
         fobj = self.copy()
         fobj.data = Pxx_den
         fobj.data[:,0] = freq
@@ -475,6 +506,9 @@ class AeroelasticOutput:
 
         # Install the new data
         self.data = data_avg
+        
+    def averaging(self, window):
+        self.time_averaging(window)
 
     
     def time_binning(self, time_window):
@@ -508,7 +542,9 @@ class AeroelasticOutput:
 
         # Install the new data
         self.data = data_binned
-
+        
+    def binning(self, window):
+        self.time_binning(window)
 
     def summary_stats(self):
         """
@@ -540,7 +576,7 @@ class AeroelasticOutput:
         return fstats
 
     
-    def extremes(self, chanlist=None):
+    def extremes(self, chanlist=None, stat=None):
         """"""
         if chanlist is not None:
             if not isinstance(chanlist, (list, set, tuple)):
@@ -552,117 +588,29 @@ class AeroelasticOutput:
             channels = self.channels
         else:
             channels = self.ec
-            
+
         sorter = np.argsort(self.channels)
         exists = [c for c in channels if c in self.channels]
         idx = sorter[np.searchsorted(self.channels, exists, sorter=sorter)]
 
+        # Get statistic
+        self.set_extreme_stat(stat)
+        if self.extreme_stat.find('abs') >= 0:
+            mystat = self.idxabs
+        elif self.extreme_stat.find('min') >= 0:
+            mystat = self.idxmins
+        elif self.extreme_stat.find('max') >= 0:
+            mystat = self.idxmaxs
+        
         extremes = {}
         for chan, i in zip(exists, idx):
-            idx_max = self.idxmaxs[i]
+            idx_stat = mystat[i]
             extremes[chan] = {
-                "Time": self.time[idx_max],
-                **dict(zip(exists, self.data[idx_max, idx])),
+                "Time": self.time[idx_stat],
+                **dict(zip(exists, self.data[idx_stat, idx])),
             }
 
         return extremes
-
-
-    def compute_del(self, chan, fatparams, **kwargs):
-        """
-        Computes damage equivalent load of input `chan`.
-
-        Parameters
-        ----------
-        chan : str or np.array
-            Channel name or time series to calculate DEL for.
-        fatparams : FatigueParameters object
-            Instance of FatigueParameters with all material and geometry parameters
-        lifetime : int | float (optional kwargs)
-            Design lifetime of the component / material in years. If specified, overrides fatparams value.
-        load2stress : float (optional kwargs)
-            Linear scaling coefficient to convert an applied load to stress such that S = load2stress * L
-            If specified, overrides fatparams value.
-        slope : int | float (optional kwargs)
-            Slope of the fatigue curve.  If specified, overrides fatparams value.
-        ultimate_stress : float (optional kwargs)
-            Ultimate stress for use in Goodman equivalent stress calculation.  If specified, overrides fatparams value.
-        S_intercept : float (optional kwargs)
-            Stress-axis intercept of log-log S-N Wohler curve. Taken as ultimate stress unless specified.
-            If specified, overrides fatparams value.
-        rainflow_bins : int (optional kwargs)
-            Number of bins used in rainflow analysis.
-            Default: 100
-        goodman_correction: boolean (optional kwargs)
-            Whether to apply Goodman mean correction to loads and stress
-            Default: False
-        return_damage: boolean (optional kwargs)
-            Whether to compute both DEL and damage
-            Default: False
-        """
-
-        lifetime      = kwargs.get("lifetime", fatparams.lifetime)
-        load2stress   = kwargs.get("load2stress", fatparams.load2stress)
-        slope         = kwargs.get("slope", fatparams.slope)
-        Sult          = kwargs.get("ultimate_stress", fatparams.ult_stress)
-        Sc            = kwargs.get("S_intercept", fatparams.S_intercept)
-        Scin          = Sc if Sc > 0.0 else Sult
-        bins          = kwargs.get("rainflow_bins", fatparams.bins)
-        return_damage = kwargs.get("return_damage", fatparams.return_damage)
-        return_damage = kwargs.get("compute_damage", return_damage)
-        goodman       = kwargs.get("goodman_correction", fatparams.goodman)
-        goodman       = kwargs.get("goodman", goodman)
-        elapsed       = self.elapsed_time
-        if isinstance(chan, str):
-            chan = self[chan]
-
-        for k in kwargs:
-            if k not in ["lifetime", "load2stress", "slope", "ultimate_stress",
-                         "S_intercept", "rainflow_bins", "return_damage", "compute_damage",
-                         "goodman_correction", "goodman"]:
-                print(f"Unknown keyword argument, {k}")
-            
-        # Default return values
-        DEL = np.nan
-        D   = np.nan
-
-        if np.all(np.isnan(chan)):
-            return DEL, D
-
-        # Working with loads for DELs
-        try:
-            F, Fmean = fatpack.find_rainflow_ranges(chan, return_means=True)
-        except Exception:
-            F = Fmean = np.zeros(1)
-        if goodman and np.abs(load2stress) > 0.0:
-            F = fatpack.find_goodman_equivalent_stress(F, Fmean, Sult/np.abs(load2stress))
-        Nrf, Frf = fatpack.find_range_count(F, bins)
-        DELs = Frf ** slope * Nrf / elapsed
-        DEL = DELs.sum() ** (1.0 / slope)
-        # With fatpack do:
-        #curve = fatpack.LinearEnduranceCurve(1.)
-        #curve.m = slope
-        #curve.Nc = elapsed
-        #DEL = curve.find_miner_sum(np.c_[Frf, Nrf]) ** (1 / slope)
-
-        # Compute Palmgren/Miner damage using stress
-        D = np.nan # default return value
-        if return_damage and np.abs(load2stress) > 0.0:
-            try:
-                S, Mrf = fatpack.find_rainflow_ranges(chan*load2stress, return_means=True)
-            except Exception:
-                S = Mrf = np.zeros(1)
-            if goodman:
-                S = fatpack.find_goodman_equivalent_stress(S, Mrf, Sult)
-            Nrf, Srf = fatpack.find_range_count(S, bins)
-            curve = fatpack.LinearEnduranceCurve(Scin)
-            curve.m = slope
-            curve.Nc = 1
-            D = curve.find_miner_sum(np.c_[Srf, Nrf])
-            if lifetime > 0.0:
-                D *= lifetime*365.0*24.0*60.0*60.0 / elapsed
-
-        return DEL, D
 
 
         
@@ -685,9 +633,13 @@ class AeroelasticOutput:
             Default: False
         """
         for k in kwargs:
-            if k not in ["rainflow_bins", "return_damage", "compute_damage", "goodman_correction", "goodman"]:
+            if k not in ["rainflow_bins", "bins",
+                         "return_damage", "compute_damage",
+                         "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
-            
+
+        return_damage = kwargs.get("return_damage", False)
+        return_damage = kwargs.get("compute_damage", return_damage)
 
         DELs = {}
         D = {}
@@ -696,14 +648,16 @@ class AeroelasticOutput:
             goodman = kwargs.get("goodman_correction", fatparams.goodman)
             goodman = kwargs.get("goodman", goodman)
             bins = kwargs.get("rainflow_bins", fatparams.bins)
-            return_damage = kwargs.get("return_damage", fatparams.return_damage)
-            return_damage = kwargs.get("compute_damage", return_damage)
+            bins = kwargs.get("bins", bins)
                 
             try:
-                DELs[chan], D[chan] = self.compute_del(chan, fatparams,
+                DELs[chan] = fatparams.compute_del(self[chan], self.elapsed_time,
+                                                   goodman_correction=goodman,
+                                                   rainflow_bins=bins)
+                if return_damage:
+                    D[chan] = fatparams.compute_damage(self[chan],
                                                        goodman_correction=goodman,
-                                                       rainflow_bins=bins,
-                                                       return_damage=return_damage)
+                                                       rainflow_bins=bins)
 
             except IndexError:
                 print(f"Channel '{chan}' not included in DEL calculation.")

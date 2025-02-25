@@ -12,7 +12,7 @@ DATA = os.path.join(DIR, "data")
 
 FOUT  = ['AOC_WSt.out', 'DLC2.3_1.out', 'DLC2.3_2.out', 'DLC2.3_3.out']
 FOUTB = ['AOC_WSt.outb', 'Test1.outb', 'Test2.outb', 'Test3.outb', 'step_0.outb']
-
+FOUT1p1 = [f'DLC1.1_0_NREL5MW_OC3_spar_{m}.outb' for m in range(5)]
 data = {
     "Time": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
     "WindVxi": [7, 7, 7, 7, 7, 8, 8, 8, 8, 8],
@@ -20,10 +20,16 @@ data = {
     "WindVzi": [0] * 10,
 }
 mc = {"Wind": ["WindVxi", "WindVyi", "WindVzi"]}
+mc2 = {
+    "RootMc1": ["RootMxc1", "RootMyc1", "RootMzc1"],
+    "RootMc2": ["RootMxc2", "RootMyc2", "RootMzc2"],
+    "RootMc3": ["RootMxc3", "RootMyc3", "RootMzc3"],
+}
+
 fc = {
-    "RootMc1": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8),
-    "RootMc2": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8),
-    "RootMc3": FatigueParams(lifetime=25.0, slope=10.0, ultimate_stress=6e8),
+    "RootMc1": FatigueParams(slope=10.0, ultimate_stress=6e8),
+    "RootMc2": FatigueParams(slope=10.0, ultimate_stress=6e8),
+    "RootMc3": FatigueParams(slope=10.0, ultimate_stress=6e8),
 }
 
 # Channels to focus on for extreme event tabulation
@@ -50,6 +56,7 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, np.array([]))
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "max")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
@@ -65,6 +72,7 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, [1.0])
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "max")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
@@ -79,12 +87,13 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, [0.5, 0.5])
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "max")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
 
         # With trimming
-        myobj = Crunch([myout, myout], magnitude_channels=mc, trim_data=[3,6])
+        myobj = Crunch([myout, myout], magnitude_channels=mc, trim_data=[3,6], extreme_stat='abs')
         self.assertEqual(myobj.lean_flag, False)
         self.assertEqual(myobj.noutputs, 2)
         self.assertEqual(myobj.td, [3,6])
@@ -93,6 +102,7 @@ class Test_Crunch(unittest.TestCase):
         self.assertEqual(myobj.fc, {})
         npt.assert_equal(myobj.prob, [0.5, 0.5])
         pdt.assert_frame_equal(myobj.summary_stats, pd.DataFrame())
+        self.assertEqual(myobj.extreme_stat, "abs")
         self.assertEqual(myobj.extremes, {})
         pdt.assert_frame_equal(myobj.dels, pd.DataFrame())
         pdt.assert_frame_equal(myobj.damage, pd.DataFrame())
@@ -243,31 +253,31 @@ class Test_Crunch(unittest.TestCase):
         myobj = Crunch(myouts, magnitude_channels=mc)
         myobj.process_outputs()
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='weibull')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='weibull')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='weibull', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='weibull', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='rayleigh')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='rayleigh')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='rayleigh', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='rayleigh', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='uniform')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='uniform')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='uniform', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='uniform', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='bleh')
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='bleh')
         npt.assert_equal(myobj.prob, 0.1*np.ones(10))
         
-        myobj.set_probability_distribution('Wind', 7.5, kind='bleh', idx=[1,4])
+        myobj.set_probability_wind_distribution('Wind', 7.5, kind='bleh', idx=[1,4])
         npt.assert_equal(myobj.prob[[1,4]], 0.5*np.ones(2))
         
-        myobj.set_probability_distribution(np.r_[15*np.ones(9), 7.5], 7.5, kind='weibull')
+        myobj.set_probability_wind_distribution(np.r_[15*np.ones(9), 7.5], 7.5, kind='weibull')
         npt.assert_equal(myobj.prob[:-1], myobj.prob[0])
         self.assertGreater(myobj.prob[-1], myobj.prob[-2])
 
@@ -307,21 +317,56 @@ class Test_Crunch(unittest.TestCase):
         self.assertAlmostEqual(aep_w4, aep_uw4, 5)
 
         
-    
     def test_total_fatigue(self):
-        nrep = len(FOUTB)
-        myouts = [read(os.path.join(DATA, m)) for m in FOUTB]
-        myobj = Crunch(myouts[1:-1], magnitude_channels=mc, fatigue_channels=fc)
-        myobj.process_outputs()
+        # Test bulk vs stream
+        myouts = [read(os.path.join(DATA, 'DLC1p1', m)) for m in FOUT1p1]
+        myobj = Crunch(myouts, magnitude_channels=mc2, fatigue_channels=fc)
+        myobj.process_outputs(compute_damage = True)
         del1, dam1 = myobj.compute_total_fatigue()
 
-        myobj = Crunch(myouts[1:-1], lean=True, magnitude_channels=mc, fatigue_channels=fc)
-        myobj.process_outputs()
-        del2, dam2 = myobj.compute_total_fatigue()
+        myobj2 = Crunch(myouts, lean=True, magnitude_channels=mc2, fatigue_channels=fc)
+        myobj2.process_outputs(compute_damage = True)
+        del2, dam2 = myobj2.compute_total_fatigue()
 
         pdt.assert_frame_equal(del1, del2)
         pdt.assert_frame_equal(dam1, dam2)
 
+        # Test prob weighting and index
+        myobj.prob[-1] = 0.0
+        del3, dam3 = myobj.compute_total_fatigue()
+        myobj.prob[-1] = myobj.prob[-2]
+        del4, dam4 = myobj.compute_total_fatigue(idx=[0,1,2,3])
+        pdt.assert_series_equal(del3.loc['Weighted'], del4.loc['Weighted'])
+        pdt.assert_series_equal(dam3.loc['Weighted'], dam4.loc['Weighted'])
+
+        # Test lifetime and availability- only for damage now
+        myobj = Crunch(myouts, magnitude_channels=mc2, fatigue_channels=fc)
+        myobj.process_outputs(compute_damage = True)
+        del5, dam5 = myobj.compute_total_fatigue(lifetime=30, availability=1.0)
+        del6, dam6 = myobj.compute_total_fatigue(lifetime=30, availability=0.75)
+        del7, dam7 = myobj.compute_total_fatigue(lifetime=15, availability=1.0)
+        pdt.assert_frame_equal(0.75*dam5, dam6)
+        pdt.assert_frame_equal(0.5*dam5, dam7)
+
+        # Test faults
+        del8, dam8 = myobj.compute_total_fatigue(lifetime=30, availability=1.0, idx_fault=[2], n_fault=3)
+        pdt.assert_series_equal(3*myobj.damage.iloc[2], dam8.loc['Weighted'], check_names=False)
+        pdt.assert_series_equal(3*myobj.damage.iloc[2], dam8.loc['Unweighted'], check_names=False)
+        
+        # Test index conflicts
+        try:
+            _, _ = myobj.compute_total_fatigue(lifetime=15, availability=0.75, idx=[0,1,2], idx_park=[2])
+        except ValueError:
+            self.assertTrue(True)
+        try:
+            _, _ = myobj.compute_total_fatigue(lifetime=15, availability=0.75, idx=[0,1,2], idx_fault=[2])
+        except ValueError:
+            self.assertTrue(True)
+        try:
+            _, _ = myobj.compute_total_fatigue(lifetime=15, availability=0.75, idx_park=[0,1,2], idx_fault=[2])
+        except ValueError:
+            self.assertTrue(True)
+            
         
     def testProperties(self):
         myout = AeroelasticOutput(data)
