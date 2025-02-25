@@ -309,13 +309,16 @@ class Crunch:
         if self.noutputs > 0:
             self.prob = np.ones( self.noutputs ) / float(self.noutputs)
             
-    def set_probability_wind_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull", idx=None):
+    def set_probability_wind_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull", method='pdf', idx=None):
         """
-        Sets the probability of each output in the list based on a Weibull or Rayleigh
+        Sets the probability of each output in the list based on a Weibull or Rayleigh or Uniform
         distribution for windspeed.
 
-        Probability density function is sampled at each windspeed.  The resulting vector of
-        density values is then scaled such that they sum to one.
+        For the 'pdf' method, the probability density function is sampled at each windspeed.
+        For the 'cdf' method, the sorted vector of windspeeds is used to create probability bins, with the
+        difference of the cumulative density function values at bin edges used to assign probability mass values.
+
+        In all cases, the resulting vector of probability values is then scaled such that they sum to one.
 
         Parameters
         ----------
@@ -325,30 +328,66 @@ class Crunch:
             ('Wind1VelX` in OpenFAST)
         v_avg : float
             Average velocity for the wind distribution (sets the scale parameter in the distribution)
-        weibull_k : float
+        weibull_k : float (optional)
             Shape parameter for the Weibull distribution. Defaults to 2.0
-        kind : str
-            Which distribution to use.  Should be either 'weibull' or 'rayleigh'
-        idx: list or Numpy array (default None)
-            Index vector into output case list
+        kind : str (optional)
+            Which distribution to use.  Should be either 'weibull' or 'rayleigh' or 'uniform'.
+            Default is 'weibull'
+        method : str (optional)
+            Which distribution to use.  Should be either 'pdf' or 'cdf'.
+            Default is 'pdf'
+        idx: list or Numpy array (optional)
+            Index vector into output case list.  Default is None
         """
-        
+
+        # Input consistency and sanity checks
+        if len(windspeed) == 1:
+            method = 'pdf'
+            kind = 'uniform'
+        if kind.lower() == 'uniform':
+            method = 'pdf'
+        if method.lower() not in ['pdf', 'cdf']:
+            print(f"Unknown method, {method.lower()}. Expected 'pdf' or 'cdf'. Defaulting to 'pdf'")
+            method = 'pdf'
+        if kind.lower() not in ['weibull', 'rayleigh', 'rayliegh', 'uniform']:
+            print(f"Unknown probability distribution, {kind}, defaulting to uniform")
+            kind = 'uniform'
+            
         # Get windspeed from user or cases
         mywindspeed = self._get_windspeeds(windspeed, idx=idx)
 
         # Set probability from distributions
-        if kind.lower() == "weibull":
-            prob = weibull_mean(mywindspeed, weibull_k, v_avg, kind="pdf")
-            
-        elif kind.lower() in ["rayleigh", "rayliegh"]:
-            prob = rayleigh_mean(mywindspeed, v_avg, kind="pdf")
+        if method.lower() == 'pdf':
+            if kind.lower() == "weibull":
+                prob = weibull_mean(mywindspeed, weibull_k, v_avg, kind="pdf")
 
-        elif kind.lower() in ["uniform"]:
-            prob = np.ones(mywindspeed.shape)
+            elif kind.lower() in ["rayleigh", "rayliegh"]:
+                prob = rayleigh_mean(mywindspeed, v_avg, kind="pdf")
 
-        else:
-            print(f"Unknown probability distribution, {kind}, defaulting to uniform")
-            prob = np.ones(mywindspeed.shape)
+            elif kind.lower() == "uniform":
+                prob = np.ones(mywindspeed.shape)
+
+
+        elif method.lower() == 'cdf':
+            # Get unique wind speeds
+            wind_sort, unique2wind = np.unique(mywindspeed, return_inverse=True)
+
+            # Create wind speed bins for the CDF
+            bins = 0.5 * (wind_sort[:-1] + wind_sort[1:])
+            bins = np.r_[0.0, bins, np.inf]
+
+            # Get bin edge probabilities
+            if kind.lower() == "weibull":
+                prob_edge = weibull_mean(wind_sort, weibull_k, v_avg, kind="cdf")
+
+            elif kind.lower() in ["rayleigh", "rayliegh"]:
+                prob_edge = rayleigh_mean(wind_sort, v_avg, kind="cdf")
+
+            # Get bin integral probabilities
+            prob_unique = np.diff(prob_edge)
+
+            # Put back in regular indexing
+            prob = prob_unique[unique2wind]
 
         # Ensure probability sums to one for all of our cases
         self._reset_probabilities()
@@ -443,68 +482,145 @@ class Crunch:
         return aep_weighted, aep_unweighted
 
     
-    def compute_total_fatigue(self, lifetime=0.0, idx=None):
+    def compute_total_fatigue(self, lifetime=0.0, availability=1.0,
+                              idx=None, idx_park=None, idx_fault=None, n_fault=0):
         """
-        Computes total damage equivalent load and total damage based on all
-        outputs in the list.
+        Computes total damage equivalent load (DEL) and Palmgren-Miner total damage based on the
+        outputs in the list.  For DEL, only the optional input, 'idx' is used to select the correct outputs.
+        Aside from the windspeed probability, no other lifetime scaling is applied.  For the damage calculation,
+        in addition to 'lifetime' scaling, there is an allowance for operational runs with 'availability',
+        parked rotor simulations for downtime with 'idx_park' scaled with (1 - availability), and expected number
+        of fault events in a lifetime with 'idx_fault' and 'n_fault'.
+        All optional inputs are valid for the damage calculation.
 
         The `process_outputs` function shuld be run before this if the
         output statisctics were not added in streaming mode.
 
         Parameters
         ----------
-        idx: list or Numpy array (default None)
-            Index vector into output case list
+        lifetime: float (optional)
+            Number of years of expected service life of the turbine
+        availability: float (optional)
+            Fraction of time turbine is expected to be available for power production
+            versus down for maintenance.  This availability should not include expected time that
+            wind speed is below cutin or above cutout.
+        idx: list or Numpy array (optional)
+            Index vector into output case list for operational cases (even for wind speed
+            less than cutin or greater than cutout)
+        idx: list or Numpy array (optional)
+            Index vector into output case list for operational cases (even for wind speed
+            less than cutin or greater than cutout)
+        idx_park: list or Numpy array (optional)
+            Index vector into output case list for cases when rotor is parked due to maintenance downtime
+            (as opposed to parked to due below cutin or above cutout)
+        idx_fault: list or Numpy array (optional)
+            Index vector into output case list for cases when rotor is parked due to maintenance downtime
+            (as opposed to parked to due below cutin or above cutout).  If this is set, must also provide 'n_fault'
+        n_fault: int or float (optional)
+            Number of fault events in the idx_fault list that are expected to occur in the turbine liftime.
+            If this is set, must also provide 'idx_fault'
 
         Returns
         ----------
         total_dels : Pandas DataFrame
             Weighted and unweighted summations of damage equivalent loads for each fatigue channel
         total_damage : Pandas DataFrame
-            Weighted and unweighted summations of damage for each fatigue channel
+            Weighted and unweighted summations of lifetime scaled damage for each fatigue channel
         """
-        prob   = self.prob.copy()
         dels   = self.dels.fillna(0.0)
         damage = self.damage.fillna(0.0)
-        
-        if idx is not None and len(idx) > 0:
-            prob = prob[idx]
+        dels_total = None
+        damage_total = None
+
+        # Convert none inputs
+        if idx is None:
+            idx = []
+        if idx_park is None:
+            idx_park = []
+        if idx_fault is None:
+            idx_fault = []
+            
+        # Handle generic "run everything" input
+        if len(idx) == 0 and len(idx_park) == 0 and len(idx_fault)==0:
+            idx = [m for m in range(self.noutputs)]
+
+        # Look for bad index inputs
+        if np.any( np.intersect1d(idx, idx_park) ):
+            raise ValueError('Cannot have common indices in idx and idx_park')
+        if np.any( np.intersect1d(idx, idx_fault) ):
+            raise ValueError('Cannot have common indices in idx and idx_fault')
+        if np.any( np.intersect1d(idx_park, idx_fault) ):
+            raise ValueError('Cannot have common indices in idx_park and idx_fault')
+
         
         if len(dels) > 0:
-            if idx is not None and len(idx) > 0:
+            prob = self.prob.copy()
+            
+            if len(idx) > 0:
                dels = dels.iloc[idx]
+               prob = self.prob[idx]
 
+            # Make sure our probabilities sum appropriately
+            prob = prob / prob.sum()
+                
             dels_weighted = np.sum(prob[:,np.newaxis] * dels, axis=0)
             dels_unweighted = dels.mean(axis=0)
             
             dels_total = pd.DataFrame([dels_weighted, dels_unweighted],
                                       index=['Weighted','Unweighted'])
-        else:
-            dels_total = None
             
         if len(damage) > 0:
-            # Now weighted/unweighted of elapsed time
-            T = np.array( self.elapsed_time() )
+            # Will need to account for any differences in elapsed time
+            T_full = np.array( self.elapsed_time() )
+
+            # Lifetime scaling factor days * hours * min * sec
+            factor = lifetime * 365.0*24.0*60.0*60.0 if lifetime > 0.0 else 1.0
+
+            # Initialize outputs
+            damage_weighted_life = 0.0
+            damage_unweighted_life = 0.0
             
-            if idx is not None and len(idx) > 0:
+            # First do operational cases
+            if len(idx) > 0:
                damage = damage.iloc[idx]
-               T = T[idx]
+               T = T_full[idx]
+               prob = self.prob[idx]
+               prob = prob / prob.sum()
+                
+               damage_weighted = np.sum(prob[:,np.newaxis] * damage, axis=0)
+               T_weighted = np.dot(T, prob)
+               damage_weighted_life += availability * damage_weighted * factor / T_weighted
                
-            damage_weighted = np.sum(prob[:,np.newaxis] * damage, axis=0)
-            damage_unweighted = damage.mean(axis=0)
+               damage_unweighted = damage.mean(axis=0)
+               T_unweighted = T.mean()
+               damage_unweighted_life += availability * damage_unweighted * factor / T_unweighted
 
-            T_weighted = np.dot(T, prob)
-            T_unweighted = T.mean()
+            # Now add in non-operational (parked) cases
+            if len(idx_park) > 0:
+                damage = self.damage.fillna(0.0).iloc[idx_park]
+                T = T_full[idx_park]
+                prob = self.prob[idx_park]
+                prob = prob / prob.sum()
+
+                damage_weighted = np.sum(prob[:,np.newaxis] * damage, axis=0)
+                T_weighted = np.dot(T, prob)
+                damage_weighted_life += (1.0 - availability) * damage_weighted * factor / T_weighted
+
+                damage_unweighted = damage.mean(axis=0)
+                T_unweighted = T.mean()
+                damage_unweighted_life += (1.0 - availability) * damage_unweighted * factor / T_unweighted
+                
+            # Now add in fault events (fault cases)
+            if len(idx_fault) > 0:
+                if n_fault == 0:
+                    print('Warning: fault case indices provided, but n_fault=0')
+                damage = n_fault * np.sum(self.damage.fillna(0.0).iloc[idx_fault], axis=0)
+                damage_weighted_life += damage
+                damage_unweighted_life += damage
             
-            # Now lifetime scaling of damage
-            damage_weighted_life = damage_weighted * lifetime *365.0*24.0*60.0*60.0 / T_weighted
-            damage_unweighted_life = damage_unweighted * lifetime *365.0*24.0*60.0*60.0 / T_unweighted
-
             # Results in dataframe
-            damage_total = pd.DataFrame([damage_weighted, damage_unweighted, damage_weighted_life, damage_unweighted_life],
-                                        index=['Weighted','Unweighted','Lifetime Weighted','Lifetime Unweighted'])
-        else:
-            damage_total = None
+            damage_total = pd.DataFrame([damage_weighted_life, damage_unweighted_life],
+                                        index=['Weighted','Unweighted'])
 
         
         return dels_total, damage_total

@@ -1,6 +1,7 @@
 import numpy as np
 import fatpack
 
+# Curtosy of Fatpack examples!
 curves_in_air = dict(
     reference = "DNV-RP-C203 - Edition October 2024, Table 2-1 S-N curves in air",
     B1= dict(m1=4.0, loga1=15.117, m2=5, Nd=5e6, loga2=17.146, fl=127.21),
