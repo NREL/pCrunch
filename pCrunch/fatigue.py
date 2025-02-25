@@ -218,7 +218,7 @@ class FatigueParams:
         for k in kwargs:
             if k not in ["load2stress", "dnv_name", "dnv_type",
                          "slope", "Sc", "Nc", "ultimate_stress",
-                         "S_intercept", "rainflow_bins", "bins", "return_damage", "compute_damage",
+                         "S_intercept", "rainflow_bins", "bins",
                          "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
 
@@ -311,8 +311,7 @@ class FatigueParams:
         goodman       = kwargs.get("goodman", goodman)
 
         for k in kwargs:
-            if k not in ["rainflow_bins", "bins", "return_damage", "compute_damage",
-                         "goodman_correction", "goodman"]:
+            if k not in ["rainflow_bins", "bins", "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
             
         # Default return values
@@ -359,8 +358,7 @@ class FatigueParams:
         goodman       = kwargs.get("goodman", goodman)
 
         for k in kwargs:
-            if k not in ["rainflow_bins", "bins", "return_damage", "compute_damage",
-                         "goodman_correction", "goodman"]:
+            if k not in ["rainflow_bins", "bins", "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
             
         # Default return values

@@ -628,18 +628,11 @@ class AeroelasticOutput:
         goodman_correction: boolean (optional)
             Whether to apply Goodman mean correction to loads and stress
             Default: False
-        return_damage: boolean (optional)
-            Whether to compute both DEL and damage
-            Default: False
         """
         for k in kwargs:
             if k not in ["rainflow_bins", "bins",
-                         "return_damage", "compute_damage",
                          "goodman_correction", "goodman"]:
                 print(f"Unknown keyword argument, {k}")
-
-        return_damage = kwargs.get("return_damage", False)
-        return_damage = kwargs.get("compute_damage", return_damage)
 
         DELs = {}
         D = {}
@@ -654,10 +647,13 @@ class AeroelasticOutput:
                 DELs[chan] = fatparams.compute_del(self[chan], self.elapsed_time,
                                                    goodman_correction=goodman,
                                                    rainflow_bins=bins)
-                if return_damage:
+                
+                if np.abs(fatparams.load2stress) > 0.0:
                     D[chan] = fatparams.compute_damage(self[chan],
                                                        goodman_correction=goodman,
                                                        rainflow_bins=bins)
+                else:
+                    D[chan] = 0.0
 
             except IndexError:
                 print(f"Channel '{chan}' not included in DEL calculation.")
