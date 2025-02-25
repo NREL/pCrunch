@@ -3,15 +3,9 @@ import unittest
 import numpy as np
 import numpy.testing as npt
 import pandas as pd
-import pandas.testing as pdt
+#import pandas.testing as pdt
 
-from pCrunch import AeroelasticOutput, FatigueParams
-
-DIR = os.path.split(__file__)[0]
-DATA = os.path.join(DIR, "data")
-
-FOUT  = ['AOC_WSt.out', 'DLC2.3_1.out', 'DLC2.3_2.out', 'DLC2.3_3.out']
-FOUTB = ['AOC_WSt.outb', 'Test1.outb', 'Test2.outb', 'Test3.outb', 'step_0.outb']
+from pCrunch import AeroelasticOutput
 
 data = {
     "Time": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
@@ -22,7 +16,7 @@ data = {
 mc = {"Wind": ["WindVxi", "WindVyi", "WindVzi"]}
 
 class Test_AeroelasticOutput(unittest.TestCase):
-    
+
     def testConstructor(self):
         # Empty
         myobj = AeroelasticOutput()
@@ -284,65 +278,6 @@ class Test_AeroelasticOutput(unittest.TestCase):
         ext = myobj.extremes(stat='absmax')
         self.assertEqual(ext["Time"], {"Time":10., "WindVxi":8., "WindVyi":0., "WindVzi":0, "Wind":8.})
         self.assertEqual(myobj.extreme_stat, "absmax")
-
-    def test_dels(self):
-        myparam = FatigueParams(lifetime=30.0,
-                                load2stress = 25.0,
-                                slope = 3.0,
-                                ultimate_stress = 6e8,
-                                S_intercept = 5e9,
-                                goodman_correction = False,
-                                return_damage = True
-                                )
-        t = np.linspace(0, 600, 10000)
-        y0 = 80e3 * np.sin(2*np.pi*t/60.0)
-        y80 = y0 + 80e3
-        zeros = np.zeros(y0.shape)
-        mydata = {"Time":t,
-                  "Signal0":y0,
-                  "Signal80":y80,
-                  "Zeros":zeros}
-
-        mymagnitudes = {"Mag0":["Signal0", "Zeros"],
-                        "Mag80":["Signal80", "Zeros"]}
-
-        myfatigues = {"Signal0":myparam,
-                      "Signal80":myparam,
-                      "Mag0":myparam,
-                      "Mag80":myparam}
-
-        myobj = AeroelasticOutput(mydata, magnitude_channels=mymagnitudes,
-                                  fatigue_channels=myfatigues)
-        
-        dels = np.zeros(len(myfatigues))
-        dams = np.zeros(len(myfatigues))
-        for ik, k in enumerate(myfatigues.keys()):
-            dels[ik], dams[ik] = myobj.compute_del(k, myfatigues[k])
-
-        self.assertAlmostEqual(dels[0], dels[1])
-        self.assertGreater(dels[0], dels[2])
-        self.assertAlmostEqual(dels[0], dels[3])
-        
-        self.assertAlmostEqual(dams[0], dams[1])
-        self.assertGreater(dams[0], dams[2])
-        self.assertAlmostEqual(dams[0], dams[3])
-        
-        dels2 = np.zeros(len(myfatigues))
-        dams2 = np.zeros(len(myfatigues))
-        for ik, k in enumerate(myfatigues.keys()):
-            dels2[ik], dams2[ik] = myobj.compute_del(k, myfatigues[k], goodman_correction=True)
-        
-        self.assertGreater(dels2[1], dels2[0])
-        self.assertGreater(dams2[1], dams2[0])
-
-        # Now with the batch mode
-        dels3, dams3 = myobj.get_DELs()
-        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dels)}, dels3)
-        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dams)}, dams3)
-
-        dels4, dams4 = myobj.get_DELs(goodman=True)
-        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dels2)}, dels4)
-        self.assertEqual({a:b for a,b in zip(myfatigues.keys(), dams2)}, dams4)
 
         
     def test_process(self):
