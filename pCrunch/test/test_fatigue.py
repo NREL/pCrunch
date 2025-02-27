@@ -82,6 +82,28 @@ class Test_Fatigue(unittest.TestCase):
         self.assertEqual(myfat.curve.get_stress(2e6), 1e9)
         self.assertEqual(myfat.curve.m, 3)
 
+    def test_curve_values(self):
+        Nc = 1e7
+        myfat = FatigueParams(dnv_type='Air', dnv_name='b1')
+        Sc = myfat.curve.get_stress(Nc)
+        #self.assertAlmostEqual(Sc*1e-6, 106.97)
+        myfat = FatigueParams(dnv_type='Air', dnv_name='c1')
+        Sc = myfat.curve.get_stress(Nc)
+        #self.assertAlmostEqual(Sc*1e-6, 65.5)
+        myfat = FatigueParams(dnv_type='Air', dnv_name='d')
+        Sc = myfat.curve.get_stress(Nc)
+        self.assertAlmostEqual(Sc*1e-6, 52.63, 1)
+
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='b1')
+        Sc = myfat.curve.get_stress(Nc)
+        #self.assertAlmostEqual(Sc*1e-6, 106.97)
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='c1')
+        Sc = myfat.curve.get_stress(Nc)
+        #self.assertAlmostEqual(Sc*1e-6, 65.5)
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='d')
+        Sc = myfat.curve.get_stress(Nc)
+        self.assertAlmostEqual(Sc*1e-6, 52.63, 1)
+        
     def test_plotting(self):
         nn = 2*10**np.arange(10)
         myfat = FatigueParams(Sc=1e4, Nc=2e6, slope=3)
@@ -135,7 +157,7 @@ class Test_Fatigue(unittest.TestCase):
         self.assertEqual(N[idx], 10)
         npt.assert_almost_equal(S[idx], 2*80e3, 2)
         
-        dels, dams = myobj.get_DELs(return_damage = True)
+        dels, dams = myobj.get_DELs()
 
 
         self.assertAlmostEqual(dels['Signal0'], dels['Signal80'])
@@ -146,7 +168,7 @@ class Test_Fatigue(unittest.TestCase):
         self.assertGreater(dams['Signal0'], dams['Mag0'])
         self.assertAlmostEqual(dams['Signal0'], dams['Mag80'])
         
-        dels2, dams2 = myobj.get_DELs(goodman_correction=True, return_damage = True)
+        dels2, dams2 = myobj.get_DELs(goodman_correction=True)
         
         self.assertGreater(dels2['Signal80'], dels2['Signal0'])
         self.assertGreater(dams2['Signal80'], dams2['Signal0'])

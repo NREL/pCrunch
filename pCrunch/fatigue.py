@@ -2,6 +2,7 @@ import numpy as np
 import fatpack
 
 # Curtosy of Fatpack examples!
+# The different types refer to different types of welds and hot spots.  See Appendix A
 curves_in_air = dict(
     reference = "DNV-RP-C203 - Edition October 2024, Table 2-1 S-N curves in air",
     B1= dict(m1=4.0, loga1=15.117, m2=5, Nd=5e6, loga2=17.146, fl=127.21),
@@ -80,8 +81,8 @@ def dnv_in_air(name):
     """
 
     data = curves_in_air[name]
-    curve = fatpack.BiLinearEnduranceCurve(1.0)
-    curve.Nc = 10 ** data["loga1"]
+    curve = fatpack.BiLinearEnduranceCurve(1e6) # 1e6 for MPa to Pa
+    curve.Nc = 10 ** data["loga1"] 
     curve.Nd = data["Nd"]
     curve.m1 = data["m1"]
     curve.m2 = data["m2"]
@@ -112,7 +113,7 @@ def dnv_in_seawater_cathodic(name):
 
     """
     data = curves_in_seawater_with_cathodic_protection[name]
-    curve = fatpack.BiLinearEnduranceCurve(1.0)
+    curve = fatpack.BiLinearEnduranceCurve(1e6) # 1e6 for MPa to Pa
     curve.Nc = 10 ** data["loga1"]
     curve.Nd = data["Nd"]
     curve.m1 = data["m1"]
@@ -144,7 +145,7 @@ def dnv_in_seawater(name):
 
     """
     data = curves_in_seawater_for_free_corrosion[name]
-    curve = fatpack.LinearEnduranceCurve(1.0)
+    curve = fatpack.LinearEnduranceCurve(1e6) # 1e6 for MPa to Pa
     curve.Nc = 10 ** data["loga"]
     curve.m = data["m"]
     ref = curves_in_seawater_for_free_corrosion["reference"]
