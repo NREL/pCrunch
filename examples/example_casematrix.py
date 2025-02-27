@@ -32,9 +32,9 @@ if __name__ == '__main__':
         "RootMc3": ["RootMxc3", "RootMyc3", "RootMzc3"],
     }
 
-    fatigue_channels = {"RootMc1": FatigueParams(lifetime=25, slope=10),
-                        "RootMc2": FatigueParams(lifetime=25, slope=10),
-                        "RootMc3": FatigueParams(lifetime=25, slope=10),
+    fatigue_channels = {"RootMc1": FatigueParams(slope=10, ultimate_stress=6e8),
+                        "RootMc2": FatigueParams(slope=10, ultimate_stress=6e8),
+                        "RootMc3": FatigueParams(slope=10, ultimate_stress=6e8),
                         }
 
     channel_extremes = [
@@ -54,7 +54,7 @@ if __name__ == '__main__':
                       extreme_channels=channel_extremes,
                       trim_data=(0,),
                       )
-    cruncher.process_outputs(cores=3, return_damage=True, goodman=True)
+    cruncher.process_outputs(cores=3, goodman=True)
 
     if save_results:
         save_yaml(
