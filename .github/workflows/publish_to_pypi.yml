@@ -20,10 +20,10 @@ jobs:
         if: github.event_name == 'release' && github.event.action == 'published'
         steps:
             - name: checkout repository
-              uses: actions/checkout@v3
+              uses: actions/checkout@v4
 
             - name: Set up Python
-              uses: actions/setup-python@v4
+              uses: actions/setup-python@v5
               id: cp
               with:
                   python-version: "3.11"
@@ -37,7 +37,7 @@ jobs:
               run: |
                   '${{ steps.cp.outputs.python-path }}' -m build .
 
-            - uses: pypa/gh-action-pypi-publish@v1.8.5
+            - uses: pypa/gh-action-pypi-publish@v1.12.4
               with:
                   user: __token__
                   password: ${{ secrets.PYPI_API_TOKEN }}

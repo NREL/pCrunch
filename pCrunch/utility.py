@@ -1,15 +1,51 @@
-__author__ = ["Nikhar Abbas", "Jake Nunemaker"]
-__copyright__ = "Copyright 2020, National Renewable Energy Laboratory"
-__maintainer__ = ["Nikhar Abbas", "Jake Nunemaker"]
-__email__ = ["nikhar.abbas@nrel.gov", "jake.nunemaker@nrel.gov"]
-
-
 import os
 
 import pandas as pd
-#from yaml import Dumper, Loader
 import ruamel.yaml as ry
+from scipy.special import gamma
+from scipy.stats import rayleigh, weibull_min
+import numpy as np
 
+
+def weibull_mean(x, k, xbar, kind="pdf"):
+    """
+    Weibull probability/cumulative density function using desired mean value.
+    
+    Parameters
+    ----------
+    x : list or np.array
+        Vector of points to evaluate CDF
+    k : float
+        Weibull shape factor
+    xbar : float
+        Weibull mean value
+    """
+    scale = xbar / gamma(1.0 + 1.0 / k)
+    if kind.lower() == "pdf":
+        return weibull_min.pdf(x, k, loc=0, scale=scale)
+    elif kind.lower() == "cdf":
+        return weibull_min.cdf(x, k, loc=0, scale=scale)
+    else:
+        raise ValueError("Expected pdf/cdf for kind")
+
+def rayleigh_mean(x, xbar, kind="pdf"):
+    """
+    Weibull probability/cumulative density function using desired mean value.
+    
+    Parameters
+    ----------
+    x : list or np.array
+        Vector of points to evaluate CDF
+    xbar : float
+        Rayleigh mean value
+    """
+    scale = np.sqrt(2.0/np.pi) * xbar
+    if kind.lower() == "pdf":
+        return rayleigh.pdf(x, loc=0, scale=scale)
+    elif kind.lower() == "cdf":
+        return rayleigh.cdf(x, loc=0, scale=scale)
+    else:
+        raise ValueError("Expected pdf/cdf for kind")
 
 def df2dict(df):
     """
@@ -51,6 +87,45 @@ def df2dict(df):
 
     return dfd
 
+
+def dict2df(sumstats, names=None):
+    """
+    Build pandas datafrom from list of summary statistics.
+
+    Inputs:
+    -------
+    sumstats: list
+        List of the dictionaries loaded from post_process.load_yaml
+    names: list, optional
+        List of names for each run. len(sumstats)=len(names)
+
+    Returns:
+    --------
+    df: pd.DataFrame
+        pandas dataframe
+    """
+
+    if isinstance(sumstats, list):
+        if not names:
+            names = ["dataset_" + str(i) for i in range(len(sumstats))]
+        data_dict = {
+            (name, outerKey, innerKey): values
+            for name, sumdata in zip(names, sumstats)
+            for outerKey, innerDict in sumdata.items()
+            for innerKey, values in innerDict.items()
+        }
+
+    else:
+        data_dict = {
+            (outerKey, innerKey): values
+            for outerKey, innerDict in sumstats.items()
+            for innerKey, values in innerDict.items()
+        }
+
+    # Make dataframe
+    df = pd.DataFrame(data_dict)
+
+    return df
 
 def save_yaml(outdir, fname, data):
     """
@@ -102,45 +177,6 @@ def load_yaml(filepath):
 
     return data
 
-
-def dict2df(sumstats, names=None):
-    """
-    Build pandas datafrom from list of summary statistics.
-
-    Inputs:
-    -------
-    sumstats: list
-        List of the dictionaries loaded from post_process.load_yaml
-    names: list, optional
-        List of names for each run. len(sumstats)=len(names)
-
-    Returns:
-    --------
-    df: pd.DataFrame
-        pandas dataframe
-    """
-
-    if isinstance(sumstats, list):
-        if not names:
-            names = ["dataset_" + str(i) for i in range(len(sumstats))]
-        data_dict = {
-            (name, outerKey, innerKey): values
-            for name, sumdata in zip(names, sumstats)
-            for outerKey, innerDict in sumdata.items()
-            for innerKey, values in innerDict.items()
-        }
-
-    else:
-        data_dict = {
-            (outerKey, innerKey): values
-            for outerKey, innerDict in sumstats.items()
-            for innerKey, values in innerDict.items()
-        }
-
-    # Make dataframe
-    df = pd.DataFrame(data_dict)
-
-    return df
 
 
 def yaml2df(filename, names=[]):
@@ -210,41 +246,47 @@ def get_windspeeds(case_matrix, return_df=False):
     else:
         raise TypeError("case_matrix must be a dict or pd.DataFrame.")
 
-    windspeed = []
-    seed = []
-    IECtype = []
     # loop through and parse each inflow filename text entry to get wind and seed #
-    for fname in cmatrix[("InflowWind", "Filename_Uni")]:
-        if ".bts" in fname:
-            obj = fname.split("U")[-1].split("_")
-            obj2 = obj[1].split("Seed")[-1].split(".bts")
-            windspeed.append(float(obj[0]))
-            seed.append(float(obj2[0]))
-            if "NTM" in fname:
-                IECtype.append("NTM")
-            elif "ETM" in fname:
-                IECtype.append("NTM")
-            elif "EWM" in fname:
-                IECtype.append("EWM")
+    if ("InflowWind", "HWindSpeed") in cmatrix:
+        windspeed = [float(m) for m in cmatrix[("InflowWind", "HWindSpeed")]]
+        seed = [float(m) for m in cmatrix[("TurbSim", "RandSeed1")]]
+        IECtype = [None] * len(seed)
+
+    elif ("InflowWind", "Filename_Uni") in cmatrix:
+        windspeed = []
+        seed = []
+        IECtype = []
+        for fname in cmatrix[("InflowWind", "Filename_Uni")]:
+            if ".bts" in fname:
+                obj = fname.split("U")[-1].split("_")
+                obj2 = obj[1].split("Seed")[-1].split(".bts")
+                windspeed.append(float(obj[0]))
+                seed.append(float(obj2[0]))
+                if "NTM" in fname:
+                    IECtype.append("NTM")
+                elif "ETM" in fname:
+                    IECtype.append("NTM")
+                elif "EWM" in fname:
+                    IECtype.append("EWM")
+                else:
+                    IECtype.append("")
+
+            elif "ECD" in fname:
+                obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+                windspeed.append(float(obj))
+                seed.append([])
+                IECtype.append("ECD")
+
+            elif "EWS" in fname:
+                obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
+                windspeed.append(float(obj))
+                seed.append([])
+                IECtype.append("EWS")
+
             else:
-                IECtype.append("")
-
-        elif "ECD" in fname:
-            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
-            windspeed.append(float(obj))
-            seed.append([])
-            IECtype.append("ECD")
-
-        elif "EWS" in fname:
-            obj = fname.split("U")[-1].split("_D")[0].split(".wnd")[0]
-            windspeed.append(float(obj))
-            seed.append([])
-            IECtype.append("EWS")
-            
-        else:
-            print("Shouldn't get here")
-            print(fname)
-            breakpoint()
+                print("Shouldn't get here")
+                print(fname)
+                breakpoint()
 
     if return_df:
         case_matrix = pd.DataFrame(case_matrix)
