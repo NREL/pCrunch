@@ -644,6 +644,9 @@ class AeroelasticOutput:
             bins = kwargs.get("bins", bins)
                 
             try:
+                if np.isnan(np.sum(self[chan])):  # channel has a nan
+                    raise IndexError
+
                 DELs[chan] = fatparams.compute_del(self[chan], self.elapsed_time,
                                                    goodman_correction=goodman,
                                                    rainflow_bins=bins)
