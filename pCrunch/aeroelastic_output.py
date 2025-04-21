@@ -536,7 +536,7 @@ class AeroelasticOutput:
             t_end = (i_bin+1) * time_window    + self.time.min()
             time_index = np.logical_and(self.time >= t_start, self.time < t_end)
             if not np.any(time_index):
-                print('here')
+                raise Exception("Error binning time between {t_start} and {t_end}")
             data_filtered = self.data[time_index,:]
             data_binned[i_bin,:] = np.mean(data_filtered,axis=0)
 
