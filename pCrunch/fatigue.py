@@ -255,6 +255,33 @@ class FatigueParams:
         return newobj
 
     
+    def get_rainflow_matrix(self, chan, bins=20):
+        """
+        Computes ranflow counts and bins for input `chan`.
+        Typically used internally to the class, but can be used for plotting and debugging too
+        
+        Parameters
+        ----------
+        chan : np.array
+            Channel time series to calculate DEL for.
+        bins : int
+            Number of bins used in rainflow analysis.
+        goodman: boolean (optional)
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        S_ult: float (optional)
+            Ultimate stress/load for the material
+        """
+
+        S, Mrf = fatpack.find_rainflow_ranges(chan, k=256, return_means=True)
+        data_arr = np.c_[S, Mrf]
+        rowbin, colbin, rfcmat = fatpack.find_rainflow_matrix(data_arr, bins, bins, return_bins=True)
+
+        X, Y = np.meshgrid(rowbin, colbin, indexing='ij')
+
+        return rfcmat, X, Y
+
+    
     def get_rainflow_counts(self, chan, bins, S_ult=None, goodman=False):
         """
         Computes ranflow counts and bins for input `chan`.
@@ -274,7 +301,7 @@ class FatigueParams:
         """
 
         try:
-            S, Mrf = fatpack.find_rainflow_ranges(chan, return_means=True)
+            S, Mrf = fatpack.find_rainflow_ranges(chan, k=128, return_means=True)
         except Exception:
             S = Mrf = np.zeros(1)
             
