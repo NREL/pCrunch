@@ -248,7 +248,7 @@ class FatigueParams:
         
     def copy(self):
         newobj = FatigueParams(load2stress=self.load2stress,
-                               ult_stress=self.S_ult,
+                               ultimate_stress=self.S_ult,
                                bins=self.bins,
                                goodman=self.goodman)
         newobj.curve = self.curve
