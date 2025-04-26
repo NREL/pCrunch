@@ -350,7 +350,8 @@ class FatigueParams:
             return DEL, D
 
         # Working with loads for DELs
-        Nrf, Frf = self.get_rainflow_counts(chan, bins, S_ult=self.S_ult/np.abs(self.load2stress), goodman=goodman)
+        load2 = 1.0 if self.load2stress==0.0 else np.abs(self.load2stress)
+        Nrf, Frf = self.get_rainflow_counts(chan, bins, S_ult=self.S_ult/load2, goodman=goodman)
 
         slope = self.curve.m1 if hasattr(self.curve, 'm1') else self.curve.m
         DELs = Frf ** slope * Nrf / elapsed_time
