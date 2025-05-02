@@ -345,7 +345,7 @@ class Crunch:
         """
 
         # Input consistency and sanity checks
-        if len(windspeed) == 1:
+        if isinstance(windspeed, (float, int)) or len(windspeed) == 1:
             method = 'pdf'
             kind = 'uniform'
         if kind.lower() == 'uniform':
