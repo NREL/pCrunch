@@ -248,11 +248,38 @@ class FatigueParams:
         
     def copy(self):
         newobj = FatigueParams(load2stress=self.load2stress,
-                               ult_stress=self.S_ult,
+                               ultimate_stress=self.S_ult,
                                bins=self.bins,
                                goodman=self.goodman)
         newobj.curve = self.curve
         return newobj
+
+    
+    def get_rainflow_matrix(self, chan, bins=20):
+        """
+        Computes ranflow counts and bins for input `chan`.
+        Typically used internally to the class, but can be used for plotting and debugging too
+        
+        Parameters
+        ----------
+        chan : np.array
+            Channel time series to calculate DEL for.
+        bins : int
+            Number of bins used in rainflow analysis.
+        goodman: boolean (optional)
+            Whether to apply Goodman mean correction to loads and stress
+            Default: False
+        S_ult: float (optional)
+            Ultimate stress/load for the material
+        """
+
+        S, Mrf = fatpack.find_rainflow_ranges(chan, k=256, return_means=True)
+        data_arr = np.c_[S, Mrf]
+        rowbin, colbin, rfcmat = fatpack.find_rainflow_matrix(data_arr, bins, bins, return_bins=True)
+
+        X, Y = np.meshgrid(rowbin, colbin, indexing='ij')
+
+        return rfcmat, X, Y
 
     
     def get_rainflow_counts(self, chan, bins, S_ult=None, goodman=False):
@@ -274,7 +301,7 @@ class FatigueParams:
         """
 
         try:
-            S, Mrf = fatpack.find_rainflow_ranges(chan, return_means=True)
+            S, Mrf = fatpack.find_rainflow_ranges(chan, k=128, return_means=True)
         except Exception:
             S = Mrf = np.zeros(1)
             
@@ -323,7 +350,8 @@ class FatigueParams:
             return DEL, D
 
         # Working with loads for DELs
-        Nrf, Frf = self.get_rainflow_counts(chan, bins, S_ult=self.S_ult/np.abs(self.load2stress), goodman=goodman)
+        load2 = 1.0 if self.load2stress==0.0 else np.abs(self.load2stress)
+        Nrf, Frf = self.get_rainflow_counts(chan, bins, S_ult=self.S_ult/load2, goodman=goodman)
 
         slope = self.curve.m1 if hasattr(self.curve, 'm1') else self.curve.m
         DELs = Frf ** slope * Nrf / elapsed_time

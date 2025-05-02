@@ -120,6 +120,15 @@ class Test_Fatigue(unittest.TestCase):
         self.assertEqual(S.size, 50)
 
         
+    def test_rainflow_markov(self):
+        nbin = 20
+        myout = read(os.path.join(DATA, FOUT[2]))
+        myfat = FatigueParams(Sc=1e4, Nc=2e6, slope=3, ultimate_stress=1e7)
+        Z, X, Y = myfat.get_rainflow_matrix(myout['TwrBsFyt'], nbin)
+        self.assertEqual(X.shape, (nbin, nbin))
+        self.assertEqual(Y.shape, (nbin, nbin))
+        self.assertEqual(Z.shape, (nbin-1, nbin-1))
+
         
     def test_dels(self):
         myparam = FatigueParams(load2stress = 25.0,
