@@ -309,7 +309,7 @@ class Crunch:
         if self.noutputs > 0:
             self.prob = np.ones( self.noutputs ) / float(self.noutputs)
             
-    def set_probability_wind_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull", method='pdf', idx=None):
+    def set_probability_wind_distribution(self, windspeed, v_avg, weibull_k=2.0, kind="weibull", method='pdf', idx=None, v_prob=None, probability=None):
         """
         Sets the probability of each output in the list based on a Weibull or Rayleigh or Uniform
         distribution for windspeed.
@@ -331,13 +331,17 @@ class Crunch:
         weibull_k : float (optional)
             Shape parameter for the Weibull distribution. Defaults to 2.0
         kind : str (optional)
-            Which distribution to use.  Should be either 'weibull' or 'rayleigh' or 'uniform'.
+            Which distribution to use.  Should be either 'weibull' or 'rayleigh' or 'uniform' or 'user'.
             Default is 'weibull'
         method : str (optional)
             Which distribution to use.  Should be either 'pdf' or 'cdf'.
             Default is 'pdf'
         idx: list or Numpy array (optional)
             Index vector into output case list.  Default is None
+        v_prob: list or Numpy array (optional)
+            User defined wind speed for indexing probability
+        probability: list or Numpy array (optional)
+            User defined probability, indexed by v_prob
         """
 
         # Input consistency and sanity checks
@@ -349,9 +353,17 @@ class Crunch:
         if method.lower() not in ['pdf', 'cdf']:
             print(f"Unknown method, {method.lower()}. Expected 'pdf' or 'cdf'. Defaulting to 'pdf'")
             method = 'pdf'
-        if kind.lower() not in ['weibull', 'rayleigh', 'rayliegh', 'uniform']:
+        if kind.lower() not in ['weibull', 'rayleigh', 'rayliegh', 'uniform', 'user']:
             print(f"Unknown probability distribution, {kind}, defaulting to uniform")
             kind = 'uniform'
+
+        if kind == 'user':
+            if not probability:
+                raise Exception("The user must define a probability vs wind speed (v_prob)")
+            if not v_prob:
+                raise Exception("The user must define a v_prob vs wind speed (v_prob)")
+            if len(probability) != len(v_prob):
+                raise Exception(f"The length of probability ({len(probability)}) must match the length of v_prob ({len(v_prob)})")
             
         # Get windspeed from user or cases
         mywindspeed = self._get_windspeeds(windspeed, idx=idx)
@@ -388,6 +400,9 @@ class Crunch:
 
             # Put back in regular indexing
             prob = prob_unique[unique2wind]
+
+        if kind == 'user':
+            prob = np.interp(windspeed,v_prob,probability)
 
         # Ensure probability sums to one for all of our cases
         self._reset_probabilities()
