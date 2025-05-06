@@ -2,6 +2,16 @@
 
 IO and Post Processing for generic time series data of multibody aeroelastic wind turbine simulations.  Readers are provided for OpenFAST outputs, but the analysis tools are equally applicable to HAWC2, Bladed, QBlade, ADAMS, or other tools.  pCrunch attempts to capture the best of legacy tools MCrunch, MLife, and MExtremes, while also taking inspiration from other similar utilities available on Github.
 
+
+## Part of the WETO Stack
+
+pCrunch is primarily developed with the support of the U.S. Department of Energy and is part of the [WETO Software Stack](https://nrel.github.io/WETOStack). For more information and other integrated modeling software, see:
+- [Portfolio Overview](https://nrel.github.io/WETOStack/portfolio_analysis/overview.html)
+- [Entry Guide](https://nrel.github.io/WETOStack/_static/entry_guide/index.html)
+- [Systems Engineering Workshop](https://nrel.github.io/WETOStack/workshops/user_workshops_2024.html#systems-engineering)
+- [OpenFAST Workshop](https://nrel.github.io/WETOStack/workshops/user_workshops_2024.html#openfast-ecosystem)
+
+
 ## Installation as a Library
 
 pCrunch is installable through pip via `pip install pCrunch` or conda, `conda install pCrunch`.
