@@ -790,6 +790,6 @@ class Crunch:
         for m in self.outputs:
             m.time_binning(time_window)
     
-    def psd(self):
-        return [m.psd() for m in self.outputs]
+    def psd(self, nfft=None):
+        return [m.psd(nfft=nfft) for m in self.outputs]
 
