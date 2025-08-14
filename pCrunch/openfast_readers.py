@@ -35,6 +35,29 @@ def read(filename, **kwargs):
         return fastout
     else:
         return fastout[0]
+    
+def read_parallel(filenames, n_cores=1, **kwargs):
+    """
+    Read OpenFAST files in parallel.
+
+    Parameters
+    ----------
+    filenames : list of str
+        List of OpenFAST file paths.
+    n_cores : int, optional
+        Number of cores to use for parallel reading. Default is 1.
+
+    Returns
+    -------
+    list of OpenFASTOutput
+        List of OpenFASTOutput instances.
+    """
+    
+    import multiprocessing
+    with multiprocessing.Pool(n_cores) as pool:
+        outputs = pool.map(read, filenames, **kwargs)
+    
+    return outputs
 
     
 def load_FAST_out(filenames, tmin=0, tmax=float('inf'), **kwargs):
