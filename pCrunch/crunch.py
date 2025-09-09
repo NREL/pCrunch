@@ -448,7 +448,7 @@ class Crunch:
         
     def compute_aep(self, pwrchan, loss_factor=0.0, idx=None):
         """
-        Computes annual energy production based on all outputs in the list.
+        Computes annual energy production [kWh] based on all outputs in the list.
 
         Parameters
         ----------
@@ -463,10 +463,10 @@ class Crunch:
 
         Returns
         ----------
-        aep_weighted : float
+        aep_weighted_kWh : float
             Weighted AEP where each output is weighted by the probability of
             occurence determined from its average wind speed
-        aep_unweighted : float
+        aep_unweighted_kWh : float
             Unweighted AEP that assumes all outputs in the list are equally
             likely (just a mean)
         """
@@ -485,16 +485,16 @@ class Crunch:
         prob = prob / prob.sum()
 
         # Calculate scaling factor for year with losses included
-        fact = (1.0 - loss_factor) * 365.0 * 24.0 * 60.0 * 60.0
+        fact = (1.0 - loss_factor) * 365.0 * 24.0 #* 60.0 * 60.0 # Add these in for kW-s
 
         # Sum with probability.  Finding probability weighted average per second, scaled by total seconds
-        aep_weighted = fact * np.dot(E, prob) / np.dot(T, prob)
+        aep_weighted_kWh = fact * np.dot(E, prob) / np.dot(T, prob)
 
         # Assume equal probability
         prob = np.ones(E.shape)/E.size
-        aep_unweighted = fact * np.dot(E, prob) / np.dot(T, prob)
+        aep_unweighted_kWh = fact * np.dot(E, prob) / np.dot(T, prob)
 
-        return aep_weighted, aep_unweighted
+        return aep_weighted_kWh, aep_unweighted_kWh
 
     
     def compute_total_fatigue(self, lifetime=0.0, availability=1.0,

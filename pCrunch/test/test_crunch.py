@@ -290,7 +290,7 @@ class Test_Crunch(unittest.TestCase):
         myout = AeroelasticOutput(data)
         myouts = [myout]*10
 
-        aep_true = myout.compute_energy('WindVxi') * 8760*60*60/myout.elapsed_time
+        aep_true = myout.compute_energy('WindVxi') * 8760/myout.elapsed_time
         
         myobj = Crunch(myouts, magnitude_channels=mc)
         aep_w1, aep_uw1 = myobj.compute_aep('Wind')
