@@ -301,7 +301,7 @@ class FatigueParams:
         """
 
         try:
-            S, Mrf = fatpack.find_rainflow_ranges(chan, k=128, return_means=True)
+            S, Mrf = fatpack.find_rainflow_ranges(chan, k=256, return_means=True)
         except Exception:
             S = Mrf = np.zeros(1)
             
