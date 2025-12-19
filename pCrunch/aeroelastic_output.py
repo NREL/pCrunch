@@ -446,14 +446,14 @@ class AeroelasticOutput:
 
     @dataproperty
     def integrated(self):
-        return np.trapz(self.data, self.time, axis=0)
+        return np.trapezoid(self.data, self.time, axis=0)
 
     def compute_energy(self, pwrchan):
-        return np.trapz(self[pwrchan], self.time)
+        return np.trapezoid(self[pwrchan], self.time)
 
     def total_travel(self, chanstr):
         dchan = np.gradient(self[chanstr], self.time)
-        return np.trapz(np.abs(dchan), self.time)
+        return np.trapezoid(np.abs(dchan), self.time)
 
     def histogram(self, chanstr, bins=15):
         return np.histogram(self[chanstr], bins=bins, density=False)
