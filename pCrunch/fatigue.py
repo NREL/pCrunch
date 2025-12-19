@@ -298,12 +298,17 @@ class FatigueParams:
             Default: False
         S_ult: float (optional)
             Ultimate stress/load for the material
+
+        Returns
+        -------
+        N, S : 1darray
+        The count and the characteristic value for the ranges.
         """
 
         try:
-            S, Mrf = fatpack.find_rainflow_ranges(chan, k=256, return_means=True)
+            ranges, Mrf = fatpack.find_rainflow_ranges(chan, k=256, return_means=True)
         except Exception:
-            S = Mrf = np.zeros(1)
+            ranges = Mrf = np.zeros(1)
             
         if goodman:
             if S_ult is None:
@@ -312,9 +317,23 @@ class FatigueParams:
             if S_ult == 0.0:
                 raise ValueError('Must specify an ultimate_stress to use Goodman correction')
                 
-            S = fatpack.find_goodman_equivalent_stress(S, Mrf, S_ult)
-            
-        return fatpack.find_range_count(S, bins)
+            ranges = fatpack.find_goodman_equivalent_stress(ranges, Mrf, S_ult)
+
+        success = False
+        while not success:
+            try:
+                N, S = fatpack.find_range_count(ranges, bins)
+                success = True
+            except ValueError:
+                bins *= 0.5
+                if bins < 1:
+                    print(ranges)
+                    print(bins)
+                    raise Exception("Failed to find bins for ranges")
+                else:
+                    bins = int(bins)
+                    
+        return N, S
 
     
     def compute_del(self, chan, elapsed_time, **kwargs):
