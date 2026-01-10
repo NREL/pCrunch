@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pCrunch"
-version = "2.1.4"
+version = "2.1.5"
 description = "IO and Post Processing for generic time series data of multibody aeroelastic wind turbine simulations."
 readme = "README.rst"
 requires-python = ">=3.9"

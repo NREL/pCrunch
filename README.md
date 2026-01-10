@@ -49,7 +49,7 @@ To set up pCrunch for development, follow these steps:
 
 ## Examples and Documentation
 
-For an up to date example of the core functionalities, see the examples-directory for Jupyter notebook examples, or the docs-directory for the same material.
+For an up to date example of the core functionalities, see the examples-directory for Jupyter notebook examples (also visible on Github).
 
 There are two primary analysis classes in pCrunch:
 
