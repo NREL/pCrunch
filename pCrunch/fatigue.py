@@ -57,7 +57,26 @@ curves_in_seawater_for_free_corrosion = dict(
     W3= dict(m=3.0, loga=10.493),
 )
 
-def dnv_in_air(name):
+def units2nref(units):
+    if not isinstance(units, str):
+        raise ValueError(f"Units input must be a string.  Instead got, {units}")
+    if not (units.find("N") >= 0 or units.find("Pa") >= 0):
+        raise ValueError(f"Units input must be in SI units of Newtons or Newton-meters or Pascals.  Instead got, {units}")
+
+    # Get multiplier to convert from MPa or MN or MNm to x
+    pfx = units[0]
+    if pfx == 'k':
+        nref = 1e3
+    elif pfx == 'M':
+        nref = 1
+    elif pfx in ['N','P']:
+        nref = 1e6
+    else:
+        raise ValueError(f"Unrecognized units string.  Expected something like kN or MPa. Instead got, {units}")
+    
+    return nref
+
+def dnv_in_air(name, units):
     """Returns a DNV endurance curve (SN curve)
 
     This method returns an endurance curve in air according to 
@@ -67,6 +86,9 @@ def dnv_in_air(name):
     ---------
     name : str
         Name of the endurance curve.
+    units : str
+        Units for the stresses that are used for fatigue damage calculation (or forces for damage-equivalent loads).
+        Must be SI units of Newtons or Pascals.  Examples are 'kPa' or 'MNm'.
 
     Returns
     -------
@@ -81,7 +103,8 @@ def dnv_in_air(name):
     """
 
     data = curves_in_air[name]
-    curve = fatpack.BiLinearEnduranceCurve(1e6) # 1e6 for MPa to Pa
+    nref = units2nref(units)
+    curve = fatpack.BiLinearEnduranceCurve(nref) # 1e6 for MPa to Pa
     curve.Nc = 10 ** data["loga1"] 
     curve.Nd = data["Nd"]
     curve.m1 = data["m1"]
@@ -90,7 +113,7 @@ def dnv_in_air(name):
     return curve
     
     
-def dnv_in_seawater_cathodic(name):
+def dnv_in_seawater_cathodic(name, units):
     """Returns a DNV endurance curve (SN curve)
 
     This method returns an endurance curve in seawater with 
@@ -100,6 +123,9 @@ def dnv_in_seawater_cathodic(name):
     ---------
     name : str
         Name of the endurance curve.
+    units : str
+        Units for the stresses that are used for fatigue damage calculation (or forces for damage-equivalent loads).
+        Must be SI units of Newtons or Pascals.  Examples are 'kPa' or 'MNm'.
 
     Returns
     -------
@@ -113,7 +139,8 @@ def dnv_in_seawater_cathodic(name):
 
     """
     data = curves_in_seawater_with_cathodic_protection[name]
-    curve = fatpack.BiLinearEnduranceCurve(1e6) # 1e6 for MPa to Pa
+    nref = units2nref(units)
+    curve = fatpack.BiLinearEnduranceCurve(nref) # 1e6 for MPa to Pa
     curve.Nc = 10 ** data["loga1"]
     curve.Nd = data["Nd"]
     curve.m1 = data["m1"]
@@ -122,7 +149,7 @@ def dnv_in_seawater_cathodic(name):
     curve.reference = ref
     return curve
 
-def dnv_in_seawater(name):
+def dnv_in_seawater(name, units):
     """Returns a DNV endurance curve (SN curve)
 
     This method returns an endurance curve in seawater for 
@@ -132,6 +159,9 @@ def dnv_in_seawater(name):
     ---------
     name : str
         Name of the endurance curve.
+    units : str
+        Units for the stresses that are used for fatigue damage calculation (or forces for damage-equivalent loads).
+        Must be SI units of Newtons or Pascals.  Examples are 'kPa' or 'MNm'.
 
     Returns
     -------
@@ -145,7 +175,8 @@ def dnv_in_seawater(name):
 
     """
     data = curves_in_seawater_for_free_corrosion[name]
-    curve = fatpack.LinearEnduranceCurve(1e6) # 1e6 for MPa to Pa
+    nref = units2nref(units)
+    curve = fatpack.LinearEnduranceCurve(nref) # 1e6 for MPa to Pa
     curve.Nc = 10 ** data["loga"]
     curve.m = data["m"]
     ref = curves_in_seawater_for_free_corrosion["reference"]
@@ -164,13 +195,16 @@ class FatigueParams:
         1. Specify a curve from DNV-RP-C203, Fatigue in Offshore Steel Structures.
            Input keywords are "dnv_type" = (one of) ['air', 'seawater', 'cathodic'] and
            "dnv_name" = (one of) [B1, B2, C, C1, C2, D, E, G F1, F3, G, W1, W2, W3]
+           Units must be specified with the "units" input string for consistency.
 
         2. Specify the slope of the S-N curve and a point on the curve.
            Required keywords are "slope", "Nc" and "Sc".  Assumes a linear S-N curve.
+           Units are left to the user but must be consistent for all inputs.
 
         3. Specify the slope and the S-intercept point assuming a perflectly linear S-N curve
            (which might not be the actual ultimate failure stress of the material.
            Required keywords are "slope" and "S_intercept".
+           Units are left to the user but must be consistent for all inputs.
         
         Parameters
         ----------
@@ -184,6 +218,9 @@ class FatigueParams:
         dnv_name : string (optional)
             Grade of metal and hot spot exposure to use: [B1, B2, C, C1, C2, D, E, G F1, F3, G, W1, W2, W3].  Must also specify "dnv_type"
             From DNV-RP-C203, Fatigue of Metal Structures, - Edition October 2024
+        units : string (optional)
+            Units for the stresses that are used for fatigue damage calculation (or forces for damage-equivalent loads).
+            Must be SI units of Newtons or Pascals.  Examples are 'kPa' or 'MNm'.
         slope : float (optional)
             Wohler exponent in the traditional SN-curve of S = A * N ^ -(1/m).  Must either specify Sc-Nc or S_intercept.
         Sc : float (optional)
@@ -205,6 +242,7 @@ class FatigueParams:
         self.load2stress   = kwargs.get("load2stress", 1.0)
         dnv_name           = kwargs.get("dnv_name", "").upper()
         dnv_type           = kwargs.get("dnv_type", "").lower()
+        units              = kwargs.get("units", "N")
         slope              = np.abs( kwargs.get("slope", 4.0) )
         Sc                 = kwargs.get("Sc", None)
         Nc                 = kwargs.get("Nc", None)
@@ -217,7 +255,7 @@ class FatigueParams:
         self.goodman       = kwargs.get("goodman", self.goodman)
 
         for k in kwargs:
-            if k not in ["load2stress", "dnv_name", "dnv_type",
+            if k not in ["load2stress", "dnv_name", "dnv_type", "units",
                          "slope", "Sc", "Nc", "ultimate_stress",
                          "S_intercept", "rainflow_bins", "bins",
                          "goodman_correction", "goodman"]:
@@ -225,11 +263,11 @@ class FatigueParams:
 
         if dnv_name is not None and len(dnv_name) > 0:
             if dnv_type.find("cath") >= 0:
-                self.curve = dnv_in_seawater_cathodic(dnv_name)
+                self.curve = dnv_in_seawater_cathodic(dnv_name, units)
             elif dnv_type.find("sea") >= 0:
-                self.curve = dnv_in_seawater(dnv_name)
+                self.curve = dnv_in_seawater(dnv_name, units)
             elif dnv_type.find("air") >= 0:
-                self.curve = dnv_in_air(dnv_name)
+                self.curve = dnv_in_air(dnv_name, units)
             else:
                 raise ValueError(f'Unknown DNV RP-C203 curve type, {dnv_type}. Expected [air, seawater, or cathodic]')
 
@@ -316,6 +354,9 @@ class FatigueParams:
                 
             if S_ult == 0.0:
                 raise ValueError('Must specify an ultimate_stress to use Goodman correction')
+
+            if np.any(Mrf > S_ult):
+                print("Warning: Mean stress in Goodman correction is greater than ultimate stress.  Will likely lean to innacurate DEL and Damage calculations.")
                 
             ranges = fatpack.find_goodman_equivalent_stress(ranges, Mrf, S_ult)
 
@@ -375,6 +416,7 @@ class FatigueParams:
         slope = self.curve.m1 if hasattr(self.curve, 'm1') else self.curve.m
         DELs = Frf ** slope * Nrf / elapsed_time
         DEL = DELs.sum() ** (1.0 / slope)
+
         # With fatpack do:
         #curve = fatpack.LinearEnduranceCurve(1.)
         #curve.m = slope

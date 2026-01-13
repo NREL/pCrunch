@@ -111,7 +111,7 @@ class AeroelasticOutput:
             raise IndexError(f"Channel '{chan}' not found.")
         return idx
     
-    def set_data(self, datain, channelsin=None):
+    def set_data(self, datain, channelsin=None, dropna=True):
         if datain is None:
             return
         
@@ -135,6 +135,9 @@ class AeroelasticOutput:
             pass
             #print("Unknown data type.  Expected dict or list or DataFrame or Numpy Array")
             #print(f"Instead found, {type(datain)}")
+
+        if dropna:
+            self.data = self.data[~np.isnan(self.data).any(axis=1),:]
 
     def drop_channel(self, pattern):
         """

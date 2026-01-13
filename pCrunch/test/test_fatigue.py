@@ -16,7 +16,7 @@ class Test_Fatigue(unittest.TestCase):
 
     def test_init(self):
         # Test DNV curves
-        myfat = FatigueParams(dnv_type='Air', dnv_name='d')
+        myfat = FatigueParams(dnv_type='Air', dnv_name='d', units='MPa')
         self.assertEqual(myfat.load2stress, 1.0)
         self.assertEqual(myfat.S_ult, 1.0)
         self.assertEqual(myfat.bins, 100.0)
@@ -24,14 +24,14 @@ class Test_Fatigue(unittest.TestCase):
         self.assertEqual(myfat.curve.m1, 3.0)
         self.assertEqual(myfat.curve.m2, 5.0)
 
-        myfat = FatigueParams(load2stress=25.0, dnv_type='sea', dnv_name='c1')
+        myfat = FatigueParams(load2stress=25.0, dnv_type='sea', dnv_name='c1', units='MPa')
         self.assertEqual(myfat.load2stress, 25.0)
         self.assertEqual(myfat.S_ult, 1.0)
         self.assertEqual(myfat.bins, 100.0)
         self.assertEqual(myfat.goodman, False)
         self.assertEqual(myfat.curve.m, 3.0)
 
-        myfat = FatigueParams(bins=256, goodman=True, ultimate_stress=1e6, dnv_type='cathodic', dnv_name='b2')
+        myfat = FatigueParams(bins=256, goodman=True, ultimate_stress=1e6, dnv_type='cathodic', dnv_name='b2', units='MPa')
         self.assertEqual(myfat.load2stress, 1.0)
         self.assertEqual(myfat.S_ult, 1e6)
         self.assertEqual(myfat.bins, 256.0)
@@ -66,7 +66,7 @@ class Test_Fatigue(unittest.TestCase):
         self.assertEqual(myfat.curve.m, 4)
 
         # Test priority of curve setting
-        myfat = FatigueParams(dnv_type='Air', dnv_name='d', Sc=1e9, Nc=2e6, slope=3, ultimate_stress=1e10, S_intercept=1e12)
+        myfat = FatigueParams(dnv_type='Air', dnv_name='d', units='kN', Sc=1e9, Nc=2e6, slope=3, ultimate_stress=1e10, S_intercept=1e12)
         self.assertEqual(myfat.load2stress, 1.0)
         self.assertEqual(myfat.S_ult, 1e10)
         self.assertEqual(myfat.bins, 100.0)
@@ -84,25 +84,54 @@ class Test_Fatigue(unittest.TestCase):
 
     def test_curve_values(self):
         Nc = 1e7
-        myfat = FatigueParams(dnv_type='Air', dnv_name='b1')
+        myfat = FatigueParams(dnv_type='Air', dnv_name='b1', units='Pa')
         Sc = myfat.curve.get_stress(Nc)
         #self.assertAlmostEqual(Sc*1e-6, 106.97)
-        myfat = FatigueParams(dnv_type='Air', dnv_name='c1')
+        myfat = FatigueParams(dnv_type='Air', dnv_name='c1', units='Pa')
         Sc = myfat.curve.get_stress(Nc)
         #self.assertAlmostEqual(Sc*1e-6, 65.5)
-        myfat = FatigueParams(dnv_type='Air', dnv_name='d')
+        myfat = FatigueParams(dnv_type='Air', dnv_name='d', units='Pa')
         Sc = myfat.curve.get_stress(Nc)
         self.assertAlmostEqual(Sc*1e-6, 52.63, 1)
+        myfat = FatigueParams(dnv_type='Air', dnv_name='d', units='kPa')
+        Sc = myfat.curve.get_stress(Nc)
+        self.assertAlmostEqual(Sc*1e-3, 52.63, 1)
+        myfat = FatigueParams(dnv_type='Air', dnv_name='d', units='MPa')
+        Sc = myfat.curve.get_stress(Nc)
+        self.assertAlmostEqual(Sc, 52.63, 1)
 
-        myfat = FatigueParams(dnv_type='cathodic', dnv_name='b1')
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='b1', units='N')
         Sc = myfat.curve.get_stress(Nc)
         #self.assertAlmostEqual(Sc*1e-6, 106.97)
-        myfat = FatigueParams(dnv_type='cathodic', dnv_name='c1')
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='c1', units='N')
         Sc = myfat.curve.get_stress(Nc)
         #self.assertAlmostEqual(Sc*1e-6, 65.5)
-        myfat = FatigueParams(dnv_type='cathodic', dnv_name='d')
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='d', units='N')
         Sc = myfat.curve.get_stress(Nc)
         self.assertAlmostEqual(Sc*1e-6, 52.63, 1)
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='d', units='kN')
+        Sc = myfat.curve.get_stress(Nc)
+        self.assertAlmostEqual(Sc*1e-3, 52.63, 1)
+        myfat = FatigueParams(dnv_type='cathodic', dnv_name='d', units='MN')
+        Sc = myfat.curve.get_stress(Nc)
+        self.assertAlmostEqual(Sc, 52.63, 1)
+
+        # Test other units entries
+        with self.assertRaises(ValueError):
+            myfat = FatigueParams(dnv_type='cathodic', dnv_name='d', units='aa')
+            Sc = myfat.curve.get_stress(Nc)
+
+        with self.assertRaises(ValueError):
+            myfat = FatigueParams(dnv_type='cathodic', dnv_name='d', units='aN')
+            Sc = myfat.curve.get_stress(Nc)
+
+        with self.assertRaises(ValueError):
+            myfat = FatigueParams(dnv_type='cathodic', dnv_name='d', units='mN')
+            Sc = myfat.curve.get_stress(Nc)
+
+        with self.assertRaises(ValueError):
+            myfat = FatigueParams(dnv_type='cathodic', dnv_name='d', units=7)
+            Sc = myfat.curve.get_stress(Nc)
         
     def test_plotting(self):
         nn = 2*10**np.arange(10)
