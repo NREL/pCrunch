@@ -4,6 +4,7 @@ import numpy as np
 import numpy.testing as npt
 import pandas as pd
 #import pandas.testing as pdt
+import copy
 
 from pCrunch import AeroelasticOutput
 
@@ -133,6 +134,27 @@ class Test_AeroelasticOutput(unittest.TestCase):
         self.assertEqual(myobj.mc, mc)
         self.assertEqual(myobj.ec, [])
         self.assertEqual(myobj.fc, {})
+
+    def testNaNs(self):
+        data2 = copy.deepcopy(data)
+        data2["WindVxi"][-1] = np.nan
+        myobj2 = AeroelasticOutput(data2, magnitude_channels=mc)
+        self.assertEqual(myobj2.data.shape, (9,5))
+        npt.assert_equal(myobj2.data[:,0], np.array(data2["Time"][:-1]))
+        npt.assert_equal(myobj2.data[:,1], np.array(data2["WindVxi"][:-1]))
+        npt.assert_equal(myobj2.data[:,2], np.zeros(9))
+        npt.assert_equal(myobj2.data[:,3], np.zeros(9))
+        npt.assert_equal(myobj2.data[:,4], np.array(data2["WindVxi"][:-1]))
+        self.assertEqual(myobj2.channels, list(data.keys())+["Wind"])
+        self.assertEqual(myobj2.units, None)
+        self.assertEqual(myobj2.description, "")
+        self.assertEqual(myobj2.filepath, "")
+        self.assertEqual(myobj2.extreme_stat, "max")
+        self.assertEqual(myobj2.td, ())
+        self.assertEqual(myobj2.mc, mc)
+        self.assertEqual(myobj2.ec, [])
+        self.assertEqual(myobj2.fc, {})
+
         
     def testGetters(self):
         myobj = AeroelasticOutput(data, magnitude_channels=mc, dlc="/testdir/testfile")
